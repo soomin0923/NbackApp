@@ -35,7 +35,7 @@ class MainActivity : AppCompatActivity() {
     private var participantName = ""
     private var currentN = 0
     private var currentTrial = 0
-    private var totalTrials = 48
+    private var totalTrials = 5
     private var stimulusList = mutableListOf<Int>()
     private var experimentStartTime = 0L
     private var isExperimentRunning = false
@@ -303,7 +303,6 @@ class MainActivity : AppCompatActivity() {
             }
         }.start()
     }
-
     private fun saveTrialData() {
         val recognizedText = drawingView.getRecognizedText()
         val correctAnswer = getCorrectAnswer()
@@ -333,14 +332,78 @@ class MainActivity : AppCompatActivity() {
             correctAnswer = correctAnswer,
             userAnswer = recognizedText,
             timestamp = timestamp - experimentStartTime,
-            currentTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                .format(Date())
-        )
+            currentTime = "${System.currentTimeMillis()}_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())}")
 
         experimentData.add(trialData)
+
+        // 즉시 CSV에 저장 (데이터 손실 방지)
+        saveTrialDataToCSV(trialData)
+
         Log.d("NBack", "Trial ${currentTrial + 1}: stimulus=$currentStimulus, correct=$correctAnswer, user=$recognizedText")
+        Log.d("NBack", "Total trials saved so far: ${experimentData.size}")
     }
 
+    // 각 시행마다 즉시 CSV에 저장하는 함수
+    private fun saveTrialDataToCSV(trialData: TrialData) {
+        try {
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val file = File(downloadsDir, "nback_results_${participantName}_${System.currentTimeMillis() / 86400000}.csv") // 날짜별로 파일 구분
+
+            // 파일이 없으면 헤더 추가
+            val needsHeader = !file.exists()
+
+            FileWriter(file, true).use { writer ->
+                if (needsHeader) {
+                    writer.write("participant,block,trial,n,stimulus,correct_answer,user_answer,timestamp,current_time\n")
+                }
+
+                writer.write("${participantName},${trialData.block},${trialData.trial},${trialData.n},${trialData.stimulus}," +
+                        "${trialData.correctAnswer},${trialData.userAnswer},${trialData.timestamp},${trialData.currentTime}\n")
+                writer.flush()
+            }
+
+            Log.d("NBack", "Trial data saved to CSV: ${file.name}")
+        } catch (e: Exception) {
+            Log.e("NBack", "Failed to save trial data to CSV: ${e.message}")
+        }
+    }
+
+    private fun saveDataToFile() {
+        try {
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val finalFile = File(downloadsDir, "nback_results_${participantName}_FINAL_${System.currentTimeMillis()}.csv")
+
+            FileWriter(finalFile).use { writer ->
+                writer.write("participant,block,trial,n,stimulus,correct_answer,user_answer,timestamp,current_time\n")
+                experimentData.forEach { data ->
+                    writer.write("${participantName},${data.block},${data.trial},${data.n},${data.stimulus}," +
+                            "${data.correctAnswer},${data.userAnswer},${data.timestamp},${data.currentTime}\n")
+                }
+            }
+
+            // 저장된 이미지 개수 확인
+            val imageDir = File(downloadsDir, "nback_images")
+            val imageCount = if (imageDir.exists()) imageDir.listFiles()?.size ?: 0 else 0
+
+            val message = "전체 실험 완료!\n" +
+                    "참가자: $participantName\n" +
+                    "최종 CSV 파일: ${finalFile.name}\n" +
+                    "총 시행 수: ${experimentData.size}\n" +
+                    "이미지 파일: ${imageCount}개\n" +
+                    "설문 파일: nback_self_reports.csv\n" +
+                    "위치: Downloads/\n" +
+                    "총 ${totalBlocks}개 블록 완료!"
+
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            Log.d("NBack", "Final data saved to: ${finalFile.absolutePath}")
+            Log.d("NBack", "Total trials in final file: ${experimentData.size}")
+            Log.d("NBack", "Images saved: $imageCount files in nback_images folder")
+            Log.d("NBack", "Total blocks completed: $totalBlocks")
+        } catch (e: Exception) {
+            Log.e("NBack", "데이터 저장 실패", e)
+            Toast.makeText(this, "데이터 저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
     private fun getCorrectAnswer(): String {
         return when (currentN) {
             0 -> if (currentStimulus == 5) "5" else "none"
@@ -405,37 +468,6 @@ class MainActivity : AppCompatActivity() {
         progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
     }
 
-    private fun saveDataToFile() {
-        try {
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val file = File(downloadsDir, "nback_results_${System.currentTimeMillis()}.csv")
 
-            FileWriter(file).use { writer ->
-                writer.write("block,trial,n,stimulus,correct_answer,user_answer,timestamp,current_time\n")
-                experimentData.forEach { data ->
-                    writer.write("${data.block},${data.trial},${data.n},${data.stimulus}," +
-                            "${data.correctAnswer},${data.userAnswer},${data.timestamp},${data.currentTime}\n")
-                }
-            }
-
-            // 저장된 이미지 개수 확인
-            val imageDir = File(downloadsDir, "nback_images")
-            val imageCount = if (imageDir.exists()) imageDir.listFiles()?.size ?: 0 else 0
-
-            val message = "전체 실험 완료!\n" +
-                    "CSV 파일: ${file.name}\n" +
-                    "이미지 파일: ${imageCount}개\n" +
-                    "설문 파일: nback_self_reports.csv\n" +
-                    "위치: Downloads/\n" +
-                    "총 ${totalBlocks}개 블록 완료!"
-
-            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-            Log.d("NBack", "Data saved to: ${file.absolutePath}")
-            Log.d("NBack", "Images saved: $imageCount files in nback_images folder")
-            Log.d("NBack", "Total blocks completed: $totalBlocks")
-        } catch (e: Exception) {
-            Log.e("NBack", "데이터 저장 실패", e)
-            Toast.makeText(this, "데이터 저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
 }
+
