@@ -35,7 +35,7 @@ class MainActivity : AppCompatActivity() {
     private var participantName = ""
     private var currentN = 0
     private var currentTrial = 0
-    private var totalTrials = 5
+    private var totalTrials = 30
     private var stimulusList = mutableListOf<Int>()
     private var experimentStartTime = 0L
     private var isExperimentRunning = false
@@ -53,9 +53,10 @@ class MainActivity : AppCompatActivity() {
         val n: Int,
         val stimulus: Int,
         val correctAnswer: String,
-        val userAnswer: String,
         val timestamp: Long,
-        val currentTime: String
+        val currentTime: String,
+        val computerTime: String,
+        val userAnswer: String
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -278,7 +279,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startResponsePeriod() {
-        val responseTime = 4000L // 4초
+        val responseTime = 3000L // 3초
 
         object : CountDownTimer(responseTime, 100) {
             override fun onTick(millisUntilFinished: Long) {
@@ -330,9 +331,11 @@ class MainActivity : AppCompatActivity() {
             n = currentN,
             stimulus = currentStimulus,
             correctAnswer = correctAnswer,
-            userAnswer = recognizedText,
+
+            currentTime="${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())}",
             timestamp = timestamp - experimentStartTime,
-            currentTime = "${System.currentTimeMillis()}_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())}")
+            computerTime = "${System.currentTimeMillis()}",
+            userAnswer = recognizedText)
 
         experimentData.add(trialData)
 
@@ -358,7 +361,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 writer.write("${participantName},${trialData.block},${trialData.trial},${trialData.n},${trialData.stimulus}," +
-                        "${trialData.correctAnswer},${trialData.userAnswer},${trialData.timestamp},${trialData.currentTime}\n")
+                        "${trialData.correctAnswer},${trialData.computerTime},${trialData.timestamp},${trialData.currentTime}\n")
                 writer.flush()
             }
 
@@ -374,10 +377,10 @@ class MainActivity : AppCompatActivity() {
             val finalFile = File(downloadsDir, "nback_results_${participantName}_FINAL_${System.currentTimeMillis()}.csv")
 
             FileWriter(finalFile).use { writer ->
-                writer.write("participant,block,trial,n,stimulus,correct_answer,user_answer,timestamp,current_time\n")
+                writer.write("participant,block,trial,n,stimulus,correct_answer,computerTime,timestamp,current_time\n")
                 experimentData.forEach { data ->
                     writer.write("${participantName},${data.block},${data.trial},${data.n},${data.stimulus}," +
-                            "${data.correctAnswer},${data.userAnswer},${data.timestamp},${data.currentTime}\n")
+                            "${data.correctAnswer},${data.computerTime},${data.timestamp},${data.currentTime}\n")
                 }
             }
 
