@@ -1,3 +1,46 @@
 <resources>
-    <string name="app_name">Nback</string>
+    <string name="app_name">N-Back 실험</string>
+
+    <!-- Welcome Activity -->
+    <string name="welcome_title">N-Back 실험</string>
+    <string name="welcome_subtitle">작업 기억 능력을 측정하는 인지 실험입니다.\n\nS Pen을 사용하여 숫자를 입력해주세요.\n\n총 5개의 블록으로 구성되어 있으며,\n각 블록은 48개의 시행으로 이루어져 있습니다.</string>
+    <string name="participant_info">참가자 정보</string>
+    <string name="enter_participant_name">참가자 이름 또는 번호를 입력해주세요</string>
+    <string name="participant_name_hint">예: 홍길동, P001, 참가자1</string>
+    <string name="manual_button">실험 사용법</string>
+    <string name="start_experiment">실험 시작</string>
+    <string name="check_manual_first">실험 전 반드시 사용법을 확인해주세요</string>
+
+    <!-- Manual Activity -->
+    <string name="manual_title">실험 사용법</string>
+    <string name="back_button">돌아가기</string>
+
+    <!-- Self Report Activity -->
+    <string name="self_report_title">설문 조사</string>
+    <string name="block_completed">블록 완료!\n아래 질문들에 답해주세요.</string>
+    <string name="submit_survey">설문 완료</string>
+
+    <!-- Questions -->
+    <string name="question_difficulty">1. 이번 블록의 난이도는 어땠나요?</string>
+    <string name="scale_difficulty">1: 매우 쉬움 ← → 7: 매우 어려움</string>
+
+    <string name="question_concentration">2. 이번 블록 동안 얼마나 집중했나요?</string>
+    <string name="scale_concentration">1: 전혀 집중 안됨 ← → 7: 매우 집중함</string>
+
+    <string name="question_fatigue">3. 이번 블록 후 얼마나 피로한가요?</string>
+    <string name="scale_fatigue">1: 전혀 피로하지 않음 ← → 7: 매우 피로함</string>
+
+    <string name="question_confidence">4. 이번 블록에서 얼마나 잘했다고 생각하나요?</string>
+    <string name="scale_confidence">1: 매우 못함 ← → 7: 매우 잘함</string>
+
+    <string name="question_strategy">5. 이번 블록에서 어떤 전략을 사용했나요?</string>
+    <string name="hint_strategy">예: 숫자를 소리내어 반복했다, 패턴을 찾으려고 했다 등</string>
+
+    <string name="question_additional">6. 추가로 하고 싶은 말이 있나요?</string>
+    <string name="hint_additional">자유롭게 의견을 작성해주세요 (선택사항)</string>
+
+    <!-- Main Activity -->
+    <string name="canvas_hint">여기에 S Pen으로 숫자를 써주세요</string>
+    <string name="clear_button">지우기</string>
+    <string name="timer_label">타이머</string>
 </resources>

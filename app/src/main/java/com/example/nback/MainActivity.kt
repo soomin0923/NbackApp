@@ -1,7 +1,7 @@
 package com.example.nback
 
 import android.Manifest
-import android.app.AlertDialog
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.CountDownTimer
@@ -17,10 +17,11 @@ import java.io.File
 import java.io.FileWriter
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.random.Random
 
 class MainActivity : AppCompatActivity() {
 
-    // UI 요소
+    // UI 요소들
     private lateinit var drawingView: DrawingView
     private lateinit var stimulusText: TextView
     private lateinit var instructionText: TextView
@@ -29,39 +30,24 @@ class MainActivity : AppCompatActivity() {
     private lateinit var canvasHintText: TextView
     private lateinit var clearButton: Button
     private lateinit var startButton: Button
-    private lateinit var skipTutorialButton: Button
 
-    // 실험 변수
-    private val tutorialData = mutableListOf<TrialData>()
-
+    // 실험 변수들
+    private var participantName = ""
     private var currentN = 0
     private var currentTrial = 0
-    private var totalTrials =  30
+    private var totalTrials = 48
     private var stimulusList = mutableListOf<Int>()
     private var experimentStartTime = 0L
     private var isExperimentRunning = false
     private var currentStimulus = 0
     private var currentBlockName = ""
-    private var currentBlockNumber = 1
-    private val totalBlocks = 5
-    private var stimulusOnsetTime = 0L
-
-    // 피험자 정보
-    private var participantName = ""
-    private var experimentStartDate = ""
+    private var currentBlockNumber = 1  // 현재 블록 번호 (1~5)
+    private val totalBlocks = 5  // 전체 블록 수
 
     // 데이터 저장
     private val experimentData = mutableListOf<TrialData>()
 
-    // 튜토리얼 관련 변수
-    private var isTutorialMode = true
-    private var tutorialNumbers = mutableListOf<Int>()
-    private var tutorialTrial = 0
-    private val totalTutorialTrials = 20
-
     data class TrialData(
-        val participantName: String,
-        val experimentDate: String,
         val block: String,
         val trial: Int,
         val n: Int,
@@ -69,36 +55,34 @@ class MainActivity : AppCompatActivity() {
         val correctAnswer: String,
         val userAnswer: String,
         val timestamp: Long,
-        val currentTime: String,
-        val firstTouchTime: Long,
-        val lastTouchTime: Long,
-        val drawingDuration: Long,
-        val strokeCount: Int,
-        val avgStrokeDuration: Long,
-        val sPenUsageRatio: Float,
-        val responseTiming: String
+        val currentTime: String
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // 화면 꺼짐 방지 및 가로 모드 유지
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         initializeViews()
         requestPermissions()
 
-        // 튜토리얼 숫자 시퀀스 (0~9 두 번 반복)
-        tutorialNumbers = (MutableList(10) { it } + MutableList(10) { it }).toMutableList()
-        isTutorialMode = true
-        tutorialTrial = 0
-        startButton.text = "튜토리얼 시작"
-        startButton.isEnabled = true
-        skipTutorialButton.isEnabled = true
+        // Intent에서 participantName 받기
+        participantName = intent.getStringExtra("participantName") ?: "Unknown_${System.currentTimeMillis()}"
 
-        // 튜토리얼 안내 시작
-        progressText.text = "튜토리얼: 0 / $totalTutorialTrials"
-        instructionText.text = "튜토리얼: 숫자 0~9까지 두 번씩 따라 써보세요!"
-        timerText.text = ""
+        // Intent에서 resumeFromBlock 확인 (설문 조사에서 돌아온 경우)
+        val resumeFromBlock = intent.getIntExtra("resumeFromBlock", 0)
+        if (resumeFromBlock > 0) {
+            // 설문조사에서 돌아온 경우 participantName도 다시 받기
+            participantName = intent.getStringExtra("participantName") ?: participantName
+            resumeFromSelfReport(resumeFromBlock)
+        } else {
+            // 처음 시작하는 경우
+            generateStimulusSequence(0) // 0-back부터 시작
+            updateInstructionText()
+            progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
+        }
     }
 
     private fun initializeViews() {
@@ -110,46 +94,15 @@ class MainActivity : AppCompatActivity() {
         canvasHintText = findViewById(R.id.canvasHintText)
         clearButton = findViewById(R.id.clearButton)
         startButton = findViewById(R.id.startButton)
-        skipTutorialButton = findViewById(R.id.skipTutorialButton)
 
+        // 버튼 클릭 리스너 설정
         clearButton.setOnClickListener {
             drawingView.clearCanvas()
             canvasHintText.visibility = View.VISIBLE
         }
-        startButton.setOnClickListener {
-            when {
-                isTutorialMode && tutorialTrial == 0 -> {
-                    // 튜토리얼 시작
-                    tutorialNumbers = (List(10) { it } + List(10) { it }).toMutableList()
-                    // tutorialNumbers.shuffle() // 필요시
-                    startButton.isEnabled = false
-                    showTutorialNext()
-                }
-                !isTutorialMode && !isExperimentRunning -> {
-                    // 실험 시작(이 시점에서는 블록/시퀀스가 항상 준비되어 있어야 함)
-                    startExperiment()
-                }
-            }
-        }
+        startButton.setOnClickListener { startExperiment() }
 
-        skipTutorialButton.setOnClickListener {
-            if (isTutorialMode) {
-                isTutorialMode = false
-                tutorialTrial = totalTutorialTrials
-                saveTutorialDataToFile()
-                startButton.text = "0-Back 실험 시작"
-                startButton.isEnabled = true
-                skipTutorialButton.isEnabled = false
-
-                // 0-back 실험 준비 (꼭 추가)
-                currentBlockNumber = 1
-                currentN = 0
-                generateStimulusSequence(0, totalTrials)
-                updateInstructionText()
-                progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
-                timerText.text = "튜토리얼을 건너뛰었습니다.\n0-Back 실험을 시작하세요!"
-            }
-        }
+        // 캔버스 터치 시 힌트 텍스트 숨기기
         drawingView.setOnTouchListener { _, _ ->
             canvasHintText.visibility = View.GONE
             false
@@ -161,6 +114,7 @@ class MainActivity : AppCompatActivity() {
             Manifest.permission.WRITE_EXTERNAL_STORAGE,
             Manifest.permission.READ_EXTERNAL_STORAGE
         )
+
         if (permissions.any {
                 ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
             }) {
@@ -168,132 +122,51 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // 튜토리얼 루프
-    private fun showTutorialNext() {
-        if (!isTutorialMode) return
-        if (tutorialTrial >= totalTutorialTrials) {
-            finishTutorial()
-            return
+    private fun resumeFromSelfReport(blockNumber: Int) {
+        currentBlockNumber = blockNumber + 1 // 다음 블록으로 이동
+
+        when (currentBlockNumber) {
+            2 -> {
+                // 0-back 완료 후 설문 → 1-back (1회차)로
+                currentN = 1
+                generateStimulusSequence(1)
+                updateInstructionText()
+                startButton.text = "1-Back (1회차) 시작"
+                timerText.text = "설문 완료! 다음 블록을 시작하세요."
+            }
+            4 -> {
+                // 2-back (1회차) 완료 후 설문 → 1-back (2회차)로
+                currentN = 1
+                generateStimulusSequence(1)
+                updateInstructionText()
+                startButton.text = "1-Back (2회차) 시작"
+                timerText.text = "설문 완료! 다음 블록을 시작하세요."
+            }
+            6 -> {
+                // 2-back (2회차) 완료 후 설문 → 실험 완전 종료
+                saveDataToFile()
+                startButton.text = "실험 완료"
+                startButton.isEnabled = false
+                timerText.text = "모든 실험 완료!"
+                Toast.makeText(this, "전체 실험 완료! 수고하셨습니다!", Toast.LENGTH_LONG).show()
+                return
+            }
         }
-        val num = tutorialNumbers[tutorialTrial]
-        stimulusText.text = num.toString()
-        stimulusText.visibility = View.VISIBLE
-        instructionText.text = "튜토리얼: 숫자 ${num}을(를) 따라 써보세요!\n(총 ${totalTutorialTrials}회)"
-        timerText.text = "연습: 남은 ${totalTutorialTrials - tutorialTrial}회"
-        canvasHintText.visibility = View.VISIBLE
 
-        object : CountDownTimer(500, 1000) {
-            override fun onTick(millisUntilFinished: Long) {}
-            override fun onFinish() {
-                stimulusText.visibility = View.INVISIBLE
-                startTutorialResponsePeriod()
-            }
-        }.start()
-    }
-
-
-    private fun startTutorialResponsePeriod() {
-        val responseTime = 2000L
-        val thisNum = tutorialNumbers[tutorialTrial]
-        object : CountDownTimer(responseTime, 1000) {
-            override fun onTick(millisUntilFinished: Long) {
-                timerText.text = "연습: 남은 시간 ${(millisUntilFinished / 1000) + 1}초"
-            }
-            override fun onFinish() {
-                saveTutorialTrialData(thisNum)
-                drawingView.clearCanvas()
-                canvasHintText.visibility = View.VISIBLE
-                tutorialTrial++
-                progressText.text = "튜토리얼: ${tutorialTrial} / ${totalTutorialTrials}"
-                showTutorialNext()
-            }
-        }.start()
-    }
-
-    private fun finishTutorial() {
-        isTutorialMode = false
-        saveTutorialDataToFile()
-        // 실험 상태 초기화
-        currentBlockNumber = 1
-        currentN = 0
         currentTrial = 0
-        isExperimentRunning = false
-        generateStimulusSequence(0, totalTrials)
-        updateInstructionText()
         progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
-        startButton.text = "0-Back 실험 시작"
         startButton.isEnabled = true
-        instructionText.text = "튜토리얼이 끝났습니다.\n이제 0-Back 실험을 시작하세요!"
     }
 
-    private fun saveTutorialTrialData(num: Int) {
-        val recognizedText = drawingView.getRecognizedText()
-        val firstTouchTime = drawingView.getFirstTouchTime()
-        val lastTouchTime = drawingView.getLastTouchTime()
-        val drawingDuration = drawingView.getTotalDrawingDuration()
-        val strokeCount = drawingView.getStrokeCount()
-        val avgStrokeDuration = drawingView.getAverageStrokeDuration()
-        val sPenUsageRatio = drawingView.getSPenUsageRatio()
-        val tutorialOnset = System.currentTimeMillis()
-        val imageFileName = "tutorial_${participantName}_${String.format("%02d", tutorialTrial + 1)}_${num}_${tutorialOnset}"
-
-        if (drawingView.hasUserDrawing()) {
-            drawingView.saveCanvasAsPNG(imageFileName, participantName)
-        }
-
-        val trialData = TrialData(
-            participantName = participantName,
-            experimentDate = experimentStartDate,
-            block = "Tutorial",
-            trial = tutorialTrial + 1,
-            n = 0,
-            stimulus = num,
-            correctAnswer = num.toString(),
-            userAnswer = recognizedText,
-            timestamp = tutorialOnset,
-            currentTime = String.format("%.7f", tutorialOnset / 1000.0),
-            firstTouchTime = firstTouchTime,
-            lastTouchTime = lastTouchTime,
-            drawingDuration = drawingDuration,
-            strokeCount = strokeCount,
-            avgStrokeDuration = avgStrokeDuration,
-            sPenUsageRatio = sPenUsageRatio,
-            responseTiming = "tutorial"
-        )
-        tutorialData.add(trialData)
-    }
-
-    private fun saveTutorialDataToFile() {
-        try {
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val csvFileName = "tutorial_${participantName}_${experimentStartDate}_${System.currentTimeMillis()}.csv"
-            val file = File(downloadsDir, csvFileName)
-            FileWriter(file).use { writer ->
-                writer.write("participant_name,experiment_date,currentTime,block,trial,n,stimulus,timestamp,first_touch_time,last_touch_time,drawing_duration\n")
-                tutorialData.forEach { data ->
-                    writer.write("${data.participantName},${data.experimentDate},${data.currentTime}," +
-                            "${data.block},${data.trial},${data.n},${data.stimulus}," +
-                            "${data.timestamp},${data.firstTouchTime},${data.lastTouchTime},${data.drawingDuration}\n")
-                }
-            }
-            val imageDir = File(downloadsDir, "nback_images_${participantName}")
-            val imageCount = if (imageDir.exists()) imageDir.listFiles()?.count { it.name.startsWith("tutorial_") } ?: 0 else 0
-            val message = "튜토리얼 데이터 저장 완료!\nCSV: $csvFileName\n이미지: $imageCount"
-            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-            Log.d("NBack", "Tutorial data saved to: ${file.absolutePath}")
-        } catch (e: Exception) {
-            Log.e("NBack", "튜토리얼 데이터 저장 실패", e)
-            Toast.makeText(this, "튜토리얼 저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    // ------ 실험부 ------
-    private fun generateStimulusSequence(n: Int, length: Int = 30, targetRatio: Float = 0.33f) {
+    // N-back 시퀀스 생성 (원본 PsychoPy 코드 기반)
+    private fun generateStimulusSequence(n: Int, length: Int = 48, targetRatio: Float = 0.33f) {
         stimulusList.clear()
         val digits = (0..9).toList()
         val numTargets = (length * targetRatio).toInt()
+
         when (n) {
             0 -> {
+                // 0-back: 특정 숫자(5)가 타겟
                 val targetDigit = 5
                 val targetPositions = (0 until length).shuffled().take(numTargets)
                 repeat(length) { i ->
@@ -304,43 +177,17 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             else -> {
+                // 1-back, 2-back: N번째 이전과 동일한 숫자가 타겟
                 repeat(length) { stimulusList.add(digits.random()) }
                 val candidatePositions = (n until length).toList()
                 val targetPositions = candidatePositions.shuffled().take(numTargets)
+
+                // 타겟 위치에서 N번째 이전과 동일하게 설정
                 targetPositions.forEach { i ->
                     stimulusList[i] = stimulusList[i - n]
                 }
-                val nonTargetPositions = candidatePositions - targetPositions.toSet()
-                nonTargetPositions.forEach { i ->
-                    if (stimulusList[i] == stimulusList[i - n]) {
-                        stimulusList[i] = digits.filter { it != stimulusList[i - n] }.random()
-                    }
-                }
-            }
-        }
-    }
-    private fun generateStimulusSequence2(n: Int, length: Int = 30, targetRatio: Float = 0.1f) {
-        stimulusList.clear()
-        val digits = (0..9).toList()
-        val numTargets = (length * targetRatio).toInt()
-        when (n) {
-            0 -> {
-                val targetDigit = 5
-                val targetPositions = (0 until length).shuffled().take(numTargets)
-                repeat(length) { i ->
-                    stimulusList.add(
-                        if (i in targetPositions) targetDigit
-                        else digits.filter { it != targetDigit }.random()
-                    )
-                }
-            }
-            else -> {
-                repeat(length) { stimulusList.add(digits.random()) }
-                val candidatePositions = (n until length).toList()
-                val targetPositions = candidatePositions.shuffled().take(numTargets)
-                targetPositions.forEach { i ->
-                    stimulusList[i] = stimulusList[i - n]
-                }
+
+                // 비타겟 위치에서 N번째 이전과 다르게 설정
                 val nonTargetPositions = candidatePositions - targetPositions.toSet()
                 nonTargetPositions.forEach { i ->
                     if (stimulusList[i] == stimulusList[i - n]) {
@@ -353,79 +200,52 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateInstructionText() {
         val instruction = when (currentN) {
-            0 -> "현재 화면에 표시되는 \n 숫자를 써주세요"
+            0 -> "현재 화면에 표시되는\n 숫자를 써주세요"
             1 -> "1번째 이전에 표시된 \n 숫자를 써주세요"
             2 -> "2번째 이전에 표시된 \n 숫자를 써주세요"
             else -> "N-Back 테스트"
         }
+
+        // 블록 번호 포함하여 표시
         val blockCount = when (currentN) {
-            1 -> if (currentBlockNumber == 2) "1회차" else if (currentBlockNumber == 4) "2회차" else ""
-            2 -> if (currentBlockNumber == 3) "1회차" else if (currentBlockNumber == 5) "2회차" else ""
+            1 -> if (currentBlockNumber == 2) "1회차" else "2회차"
+            2 -> if (currentBlockNumber == 3) "1회차" else "2회차"
             else -> ""
         }
+
         val title = if (blockCount.isNotEmpty()) {
             "현재 난이도: ${currentN}-back ($blockCount)"
         } else {
             "현재 난이도: ${currentN}-back"
         }
+
         instructionText.text = "$title\n$instruction"
         currentBlockName = "${currentN}-Back_${currentBlockNumber}"
     }
 
-
-
     private fun startExperiment() {
         if (isExperimentRunning) return
-        // 피험자 이름 입력 없으면 다이얼로그
-        if (participantName.isEmpty()) {
-            showParticipantNameDialog()
-            return
-        }
+
         isExperimentRunning = true
         currentTrial = 0
         experimentStartTime = System.currentTimeMillis()
         startButton.isEnabled = false
-        skipTutorialButton.isEnabled = false
         startButton.text = "실험 진행 중..."
-        updateInstructionText()
-        progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
+
+        // 3초 카운트다운 후 시작
         showCountdown()
     }
 
-    private fun showParticipantNameDialog() {
-        val input = EditText(this)
-        input.hint = "피험자 이름을 입력하세요 (예: 홍길동)"
-        AlertDialog.Builder(this)
-            .setTitle("실험 참여자 정보")
-            .setMessage("실험 데이터 관리를 위해 이름을 입력해주세요.")
-            .setView(input)
-            .setPositiveButton("확인") { _, _ ->
-                val name = input.text.toString().trim()
-                if (name.isNotEmpty()) {
-                    participantName = name
-                    experimentStartDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                        .format(Date())
-                    Toast.makeText(this, "${participantName}님, 실험에 참여해주셔서 감사합니다!",
-                        Toast.LENGTH_LONG).show()
-                    startButton.text = "${participantName}님 실험 시작"
-                    Log.d("NBack", "Participant registered: $participantName, Date: $experimentStartDate")
-                } else {
-                    Toast.makeText(this, "이름을 입력해주세요.", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("취소", null)
-            .setCancelable(false)
-            .show()
-    }
-
     private fun showCountdown() {
-        var countdown = 3000
+        var countdown = 3
         timerText.text = "시작까지 $countdown 초"
-        val countdownTimer = object : CountDownTimer(15000, 1000) {
+
+        val countdownTimer = object : CountDownTimer(3000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 countdown = (millisUntilFinished / 1000).toInt() + 1
                 timerText.text = "시작까지 $countdown 초"
             }
+
             override fun onFinish() {
                 timerText.text = "실험 시작!"
                 showNextStimulus()
@@ -439,13 +259,15 @@ class MainActivity : AppCompatActivity() {
             finishCurrentBlock()
             return
         }
+
         currentStimulus = stimulusList[currentTrial]
         stimulusText.text = currentStimulus.toString()
         stimulusText.visibility = View.VISIBLE
-        stimulusOnsetTime = System.currentTimeMillis()
+
         progressText.text = "시행: ${currentTrial + 1} / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
         timerText.text = "숫자 제시 중..."
-        drawingView.setStimulusOnsetTime(stimulusOnsetTime)
+
+        // 0.5초 동안 자극 제시
         object : CountDownTimer(500, 100) {
             override fun onTick(millisUntilFinished: Long) {}
             override fun onFinish() {
@@ -456,15 +278,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startResponsePeriod() {
-        val responseTime = 3000L
+        val responseTime = 4000L // 4초
+
         object : CountDownTimer(responseTime, 100) {
             override fun onTick(millisUntilFinished: Long) {
                 val secondsLeft = (millisUntilFinished / 1000) + 1
                 timerText.text = "답 작성 시간: ${secondsLeft}초"
             }
+
             override fun onFinish() {
                 timerText.text = "시간 종료"
                 saveTrialData()
+
+                // 1초 후 다음 시행으로 진행
                 object : CountDownTimer(1000, 1000) {
                     override fun onTick(millisUntilFinished: Long) {}
                     override fun onFinish() {
@@ -481,25 +307,13 @@ class MainActivity : AppCompatActivity() {
     private fun saveTrialData() {
         val recognizedText = drawingView.getRecognizedText()
         val correctAnswer = getCorrectAnswer()
-        val firstTouchTime = drawingView.getFirstTouchTime()
-        val lastTouchTime = drawingView.getLastTouchTime()
-        val drawingDuration = drawingView.getTotalDrawingDuration()
-        val strokeCount = drawingView.getStrokeCount()
-        val avgStrokeDuration = drawingView.getAverageStrokeDuration()
-        val sPenUsageRatio = drawingView.getSPenUsageRatio()
-        val absoluteFirstTouch = if (firstTouchTime > 0) firstTouchTime - experimentStartTime else 0L
-        val absoluteLastTouch = if (lastTouchTime > 0) lastTouchTime - experimentStartTime else 0L
-        val absoluteStimulusOnset = stimulusOnsetTime - experimentStartTime
-        val reactionTime = if (firstTouchTime > 0) firstTouchTime - stimulusOnsetTime else 0L
-        val responseTiming = when {
-            reactionTime <= 0L -> "no_response"
-            reactionTime <= 1333 -> "early"
-            reactionTime <= 2666 -> "middle"
-            else -> "late"
-        }
-        val currentTime = System.currentTimeMillis()
-        val imageFileName = "${participantName}_${currentBlockName}_trial${String.format("%02d", currentTrial + 1)}_" +
-                "stimulus${currentStimulus}_${currentTime}"
+
+        // PNG 이미지 파일명 생성: [블록]_trial[번호]_stimulus[숫자]_[타임스탬프]
+        val timestamp = System.currentTimeMillis()
+        val imageFileName = "${currentBlockName}_trial${String.format("%02d", currentTrial + 1)}_" +
+                "stimulus${currentStimulus}_${timestamp}"
+
+        // 캔버스를 PNG로 저장 (그려진 내용이 있을 때만)
         if (drawingView.hasUserDrawing()) {
             val imageSaved = drawingView.saveCanvasAsPNG(imageFileName, participantName)
             if (imageSaved) {
@@ -510,32 +324,21 @@ class MainActivity : AppCompatActivity() {
         } else {
             Log.d("NBack", "No drawing to save for trial ${currentTrial + 1}")
         }
+
         val trialData = TrialData(
-            participantName = participantName,
-            experimentDate = experimentStartDate,
             block = currentBlockName,
             trial = currentTrial + 1,
             n = currentN,
             stimulus = currentStimulus,
             correctAnswer = correctAnswer,
             userAnswer = recognizedText,
-            timestamp = absoluteStimulusOnset,
-            currentTime = String.format("%.7f", stimulusOnsetTime / 1000.0),
-            firstTouchTime = absoluteFirstTouch,
-            lastTouchTime = absoluteLastTouch,
-            drawingDuration = drawingDuration,
-            strokeCount = strokeCount,
-            avgStrokeDuration = avgStrokeDuration,
-            sPenUsageRatio = sPenUsageRatio,
-            responseTiming = responseTiming
+            timestamp = timestamp - experimentStartTime,
+            currentTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                .format(Date())
         )
+
         experimentData.add(trialData)
-        Log.d("NBack", "Trial ${currentTrial + 1}: stimulus=$currentStimulus " +
-                "(onset: ${absoluteStimulusOnset}ms), " +
-                "correct=$correctAnswer, user=$recognizedText, " +
-                "firstTouch=${absoluteFirstTouch}ms, lastTouch=${absoluteLastTouch}ms, " +
-                "reactionTime=${reactionTime}ms, duration=${drawingDuration}ms, " +
-                "strokes=$strokeCount, timing=$responseTiming, sPenRatio=$sPenUsageRatio")
+        Log.d("NBack", "Trial ${currentTrial + 1}: stimulus=$currentStimulus, correct=$correctAnswer, user=$recognizedText")
     }
 
     private fun getCorrectAnswer(): String {
@@ -555,52 +358,49 @@ class MainActivity : AppCompatActivity() {
     private fun finishCurrentBlock() {
         isExperimentRunning = false
         startButton.isEnabled = true
-        skipTutorialButton.isEnabled = false
-        when (currentBlockNumber) {
-            1 -> {
-                currentBlockNumber = 2
-                currentN = 1
-                generateStimulusSequence(1, totalTrials)
-                updateInstructionText()
-                startButton.text = "1-Back (1회차) 시작"
-                timerText.text = "0-Back 완료!"
-                Toast.makeText(this, "0-Back 완료! 1-Back (1회차)을 시작하세요.", Toast.LENGTH_LONG).show()
+
+        // 블록 1, 3, 5가 끝나면 설문조사로 이동
+        if (currentBlockNumber == 1 || currentBlockNumber == 3 || currentBlockNumber == 5) {
+            try {
+                val intent = Intent(this, SelfReportActivity::class.java).apply {
+                    putExtra("blockNumber", currentBlockNumber)
+                    putExtra("blockName", currentBlockName)
+                    putExtra("participantName", participantName)
+                }
+                startActivity(intent)
+                finish() // MainActivity 종료
+                return
+            } catch (e: Exception) {
+                Log.e("NBack", "Failed to start SelfReportActivity: ${e.message}")
+                Toast.makeText(this, "설문조사 화면 로딩 실패. 다음 블록으로 진행합니다.", Toast.LENGTH_SHORT).show()
+                // 설문조사 실패시 바로 다음 블록으로 진행
             }
+        }
+
+        // 설문조사 없는 블록들의 처리
+        when (currentBlockNumber) {
             2 -> {
+                // 1-back (1회차) 완료 → 2-back (1회차)로
                 currentBlockNumber = 3
                 currentN = 2
-                generateStimulusSequence(2, totalTrials)
+                generateStimulusSequence(2)
                 updateInstructionText()
                 startButton.text = "2-Back (1회차) 시작"
                 timerText.text = "1-Back (1회차) 완료!"
                 Toast.makeText(this, "1-Back (1회차) 완료! 2-Back (1회차)을 시작하세요.", Toast.LENGTH_LONG).show()
             }
-            3 -> {
-                currentBlockNumber = 4
-                currentN = 1
-                generateStimulusSequence2(1, totalTrials)
-                updateInstructionText()
-                startButton.text = "1-Back (2회차) 시작"
-                timerText.text = "2-Back (1회차) 완료!"
-                Toast.makeText(this, "2-Back (1회차) 완료! 1-Back (2회차)을 시작하세요.", Toast.LENGTH_LONG).show()
-            }
             4 -> {
+                // 1-back (2회차) 완료 → 2-back (2회차)로
                 currentBlockNumber = 5
                 currentN = 2
-                generateStimulusSequence2(2, totalTrials)
+                generateStimulusSequence(2)
                 updateInstructionText()
                 startButton.text = "2-Back (2회차) 시작"
                 timerText.text = "1-Back (2회차) 완료!"
                 Toast.makeText(this, "1-Back (2회차) 완료! 마지막 2-Back (2회차)을 시작하세요.", Toast.LENGTH_LONG).show()
             }
-            5 -> {
-                saveDataToFile()
-                startButton.text = "실험 완료"
-                startButton.isEnabled = false
-                timerText.text = "모든 실험 완료!"
-                Toast.makeText(this, "🎉 전체 실험 완료! 수고하셨습니다!", Toast.LENGTH_LONG).show()
-            }
         }
+
         currentTrial = 0
         progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
     }
@@ -608,29 +408,30 @@ class MainActivity : AppCompatActivity() {
     private fun saveDataToFile() {
         try {
             val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val csvFileName = "nback_${participantName}_${experimentStartDate}_${System.currentTimeMillis()}.csv"
-            val file = File(downloadsDir, csvFileName)
+            val file = File(downloadsDir, "nback_results_${System.currentTimeMillis()}.csv")
+
             FileWriter(file).use { writer ->
-                writer.write("participant_name,experiment_date, currentTime, block,trial,n,stimulus," +
-                        "timestamp,first_touch_time,last_touch_time,drawing_duration\n")
+                writer.write("block,trial,n,stimulus,correct_answer,user_answer,timestamp,current_time\n")
                 experimentData.forEach { data ->
-                    writer.write("${data.participantName},${data.experimentDate}, ${data.currentTime}," +
-                            "${data.block},${data.trial},${data.n},${data.stimulus}," +
-                            "${data.timestamp}," +
-                            "${data.firstTouchTime},${data.lastTouchTime},${data.drawingDuration}\n")
+                    writer.write("${data.block},${data.trial},${data.n},${data.stimulus}," +
+                            "${data.correctAnswer},${data.userAnswer},${data.timestamp},${data.currentTime}\n")
                 }
             }
-            val imageDir = File(downloadsDir, "nback_images_${participantName}")
+
+            // 저장된 이미지 개수 확인
+            val imageDir = File(downloadsDir, "nback_images")
             val imageCount = if (imageDir.exists()) imageDir.listFiles()?.size ?: 0 else 0
-            val message = "🎉 ${participantName}님 실험 완료!\n" +
-                    "📊 CSV 파일: ${csvFileName}\n" +
-                    "🖼️ 이미지 파일: ${imageCount}개\n" +
-                    "📁 이미지 위치: Downloads/nback_images_${participantName}/\n" +
+
+            val message = "전체 실험 완료!\n" +
+                    "CSV 파일: ${file.name}\n" +
+                    "이미지 파일: ${imageCount}개\n" +
+                    "설문 파일: nback_self_reports.csv\n" +
+                    "위치: Downloads/\n" +
                     "총 ${totalBlocks}개 블록 완료!"
+
             Toast.makeText(this, message, Toast.LENGTH_LONG).show()
             Log.d("NBack", "Data saved to: ${file.absolutePath}")
-            Log.d("NBack", "Images saved: $imageCount files in nback_images_${participantName} folder")
-            Log.d("NBack", "Participant: $participantName, Date: $experimentStartDate")
+            Log.d("NBack", "Images saved: $imageCount files in nback_images folder")
             Log.d("NBack", "Total blocks completed: $totalBlocks")
         } catch (e: Exception) {
             Log.e("NBack", "데이터 저장 실패", e)
