@@ -35,7 +35,7 @@ class MainActivity : AppCompatActivity() {
     private var participantName = ""
     private var currentN = 0
     private var currentTrial = 0
-    private var totalTrials = 30
+    private var totalTrials = 2
     private var stimulusList = mutableListOf<Int>()
     private var experimentStartTime = 0L
     private var isExperimentRunning = false
@@ -73,17 +73,40 @@ class MainActivity : AppCompatActivity() {
         participantName = intent.getStringExtra("participantName") ?: "Unknown_${System.currentTimeMillis()}"
 
         // Intent에서 resumeFromBlock 확인 (설문 조사에서 돌아온 경우)
-        val resumeFromBlock = intent.getIntExtra("resumeFromBlock", 0)
-        if (resumeFromBlock > 0) {
+        val resumeFromBlock = intent.getIntExtra("resumeFromBlock", -1) // -1로 변경
+        if (resumeFromBlock >= 0) { // >= 0으로 변경 (baseline도 포함)
             // 설문조사에서 돌아온 경우 participantName도 다시 받기
             participantName = intent.getStringExtra("participantName") ?: participantName
             resumeFromSelfReport(resumeFromBlock)
         } else {
-            // 처음 시작하는 경우
-            generateStimulusSequence(0) // 0-back부터 시작
-            updateInstructionText()
-            progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
+            // 처음 시작하는 경우 → 바로 baseline 설문조사로 이동
+            startBaselineSurvey()
         }
+    }
+    // 새로 추가할 함수: baseline 설문조사 시작
+    private fun startBaselineSurvey() {
+        try {
+            val intent = Intent(this, SelfReportActivity::class.java).apply {
+                putExtra("blockNumber", 0) // 0은 baseline을 의미
+                putExtra("blockName", "Baseline")
+                putExtra("participantName", participantName)
+                putExtra("surveyType", "baseline") // 설문 타입 추가
+            }
+            startActivity(intent)
+            finish() // MainActivity 종료
+        } catch (e: Exception) {
+            Log.e("NBack", "Failed to start baseline survey: ${e.message}")
+            Toast.makeText(this, "설문조사 실패. 실험을 바로 시작합니다.", Toast.LENGTH_SHORT).show()
+            // 설문조사 실패시 바로 실험 시작
+            startExperimentDirectly()
+        }
+    }
+
+    // 새로 추가할 함수: 설문조사 없이 바로 실험 시작
+    private fun startExperimentDirectly() {
+        generateStimulusSequence(0) // 0-back부터 시작
+        updateInstructionText()
+        progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
     }
 
     private fun initializeViews() {
@@ -124,33 +147,44 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun resumeFromSelfReport(blockNumber: Int) {
-        currentBlockNumber = blockNumber + 1 // 다음 블록으로 이동
-
-        when (currentBlockNumber) {
-            2 -> {
-                // 0-back 완료 후 설문 → 1-back (1회차)로
-                currentN = 1
-                generateStimulusSequence(1)
+        when (blockNumber) {
+            0 -> {
+                // Baseline 설문 완료 → 실험 시작 (0-back)
+                currentBlockNumber = 1
+                currentN = 0
+                generateStimulusSequence(0)
                 updateInstructionText()
-                startButton.text = "1-Back (1회차) 시작"
-                timerText.text = "설문 완료! 다음 블록을 시작하세요."
+                startButton.text = "0-Back 시작"
+                timerText.text = "사전 설문 완료! 실험을 시작하세요."
+                Toast.makeText(this, "사전 설문 완료! 0-Back 실험을 시작하세요.", Toast.LENGTH_LONG).show()
             }
-            4 -> {
-                // 2-back (1회차) 완료 후 설문 → 1-back (2회차)로
+            3 -> {
+                // 중간 설문 완료 (Block 3 완료 후) → 1-back (2회차)로
+                currentBlockNumber = 4
                 currentN = 1
                 generateStimulusSequence(1)
                 updateInstructionText()
                 startButton.text = "1-Back (2회차) 시작"
-                timerText.text = "설문 완료! 다음 블록을 시작하세요."
+                timerText.text = "중간 설문 완료! 다음 블록을 시작하세요."
+                Toast.makeText(this, "중간 설문 완료! 1-Back (2회차)을 시작하세요.", Toast.LENGTH_LONG).show()
             }
-            6 -> {
-                // 2-back (2회차) 완료 후 설문 → 실험 완전 종료
+            5 -> {
+                // 최종 설문 완료 (Block 5 완료 후) → 실험 완전 종료
                 saveDataToFile()
                 startButton.text = "실험 완료"
                 startButton.isEnabled = false
                 timerText.text = "모든 실험 완료!"
                 Toast.makeText(this, "전체 실험 완료! 수고하셨습니다!", Toast.LENGTH_LONG).show()
                 return
+            }
+            else -> {
+                // 예상치 못한 경우 → 실험 시작
+                currentBlockNumber = 1
+                currentN = 0
+                generateStimulusSequence(0)
+                updateInstructionText()
+                startButton.text = "실험 시작"
+                timerText.text = "실험을 시작하세요."
             }
         }
 
@@ -357,7 +391,7 @@ class MainActivity : AppCompatActivity() {
 
             FileWriter(file, true).use { writer ->
                 if (needsHeader) {
-                    writer.write("participant,block,trial,n,stimulus,correct_answer,user_answer,timestamp,current_time\n")
+                    writer.write("participant,block,trial,n,stimulus,correct_answer,computer_time,timestamp,current_time\n")
                 }
 
                 writer.write("${participantName},${trialData.block},${trialData.trial},${trialData.n},${trialData.stimulus}," +
@@ -425,13 +459,16 @@ class MainActivity : AppCompatActivity() {
         isExperimentRunning = false
         startButton.isEnabled = true
 
-        // 블록 1, 3, 5가 끝나면 설문조사로 이동
-        if (currentBlockNumber == 1 || currentBlockNumber == 3 || currentBlockNumber == 5) {
+        // 블록 3, 5가 끝나면 설문조사로 이동 (블록 1은 제외)
+        if (currentBlockNumber == 3 || currentBlockNumber == 5) {
+            val surveyType = if (currentBlockNumber == 3) "middle" else "final"
+
             try {
                 val intent = Intent(this, SelfReportActivity::class.java).apply {
                     putExtra("blockNumber", currentBlockNumber)
                     putExtra("blockName", currentBlockName)
                     putExtra("participantName", participantName)
+                    putExtra("surveyType", surveyType)
                 }
                 startActivity(intent)
                 finish() // MainActivity 종료
@@ -445,6 +482,16 @@ class MainActivity : AppCompatActivity() {
 
         // 설문조사 없는 블록들의 처리
         when (currentBlockNumber) {
+            1 -> {
+                // 0-back 완료 → 1-back (1회차)로
+                currentBlockNumber = 2
+                currentN = 1
+                generateStimulusSequence(1)
+                updateInstructionText()
+                startButton.text = "1-Back (1회차) 시작"
+                timerText.text = "0-Back 완료!"
+                Toast.makeText(this, "0-Back 완료! 1-Back (1회차)을 시작하세요.", Toast.LENGTH_LONG).show()
+            }
             2 -> {
                 // 1-back (1회차) 완료 → 2-back (1회차)로
                 currentBlockNumber = 3

@@ -23,7 +23,7 @@
             android:id="@+id/titleText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="설문 조사"
+            android:text="self-report time"
             android:textColor="#ffffff"
             android:textSize="28sp"
             android:textStyle="bold"
@@ -34,7 +34,7 @@
             android:id="@+id/blockInfoText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="블록 완료!\n아래 질문들에 답해주세요."
+            android:text="\n아래 질문들에 답해주세요."
             android:textColor="#ffffff"
             android:textSize="18sp"
             android:gravity="center" />
