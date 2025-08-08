@@ -526,7 +526,7 @@ class MainActivity : AppCompatActivity() {
             }
             6 -> {
                 // 1-back (2회차) 완료 → 2-back (2회차)로
-                currentBlockNumber = 6
+                currentBlockNumber = 7
                 currentN = 3
                 generateStimulusSequence(2)
                 updateInstructionText()

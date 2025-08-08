@@ -91,10 +91,10 @@ class SelfReportActivity : AppCompatActivity() {
 
         // PSS-10 척도 설명
         addSectionHeader("PSS-10 (지각된 스트레스 척도) - 기본 측정")
-        addScaleDescription("지난 한 달 동안의 전반적인 생활에 대해 질문합니다.\n0: 전혀 그렇지 않다 ~ 4: 매우 자주 그렇다")
+        addScaleDescription("지난 한 달 동안의 전반적인 생활에 대해 질문합니다.\n1: 전혀 그렇지 않다 ~ 5: 매우 자주 그렇다")
 
         pssQuestions.forEachIndexed { index, question ->
-            addLikertQuestion("pss_baseline_${index}", "${index}. $question", 4)
+            addLikertQuestion("pss_baseline_${index + 1}", "${index + 1}. $question", 5)
         }
 
         // 기본 정보
@@ -106,7 +106,7 @@ class SelfReportActivity : AppCompatActivity() {
     }
 
     private fun setupMiddleSurvey() {
-        titleText.text = "중간 설문조사 (Block 4 완료)"
+        titleText.text = "중간 설문조사 (Block 3 완료)"
 
         // PSS-10 질문들 (실험 과정 중 스트레스 - 수정된 문구)
         val pssQuestions = listOf(
@@ -126,16 +126,16 @@ class SelfReportActivity : AppCompatActivity() {
         addScaleDescription("지금까지 진행한 실험 과정에서의 경험에 대해 질문합니다.\n0: 전혀 그렇지 않다 ~ 4: 매우 자주 그렇다")
 
         pssQuestions.forEachIndexed { index, question ->
-            addLikertQuestion("pss_middle_${index}", "${index}. $question", 5)
+            addLikertQuestion("pss_middle_${index + 1}", "${index + 1}. $question", 5)
         }
 
         // NASA-TLX 3개 항목
-        addSectionHeader("NASA-TLX (방금 완료한 3-Back 과제)")
-        addScaleDescription("방금 완료한 3-Back (1회차) 과제에 대해 평가해주세요.\n1: 매우 낮음 ~ 7: 매우 높음")
+        addSectionHeader("NASA-TLX (방금까지의 결과)")
+        addScaleDescription("방금 완료한 과제에 대해 평가해주세요.\n1: 매우 낮음 ~ 7: 매우 높음")
 
-        addLikertQuestion("mental_demand_mid", "정신적 요구도: 3-Back 과제를 수행하는 동안 얼마나 많은 정신적 활동이 필요했습니까?", 7)
-        addLikertQuestion("frustration_mid", "좌절감: 3-Back 과제를 수행하는 동안 얼마나 불안하고, 낙담하고, 짜증나고, 스트레스를 받았습니까?", 7)
-        addLikertQuestion("effort_mid", "노력: 3-Back 과제에서 목표를 달성하기 위해 얼마나 열심히 노력해야 했습니까?", 7)
+        addLikertQuestion("mental_demand_mid", "정신적 요구도: 과제를 수행하는 동안 얼마나 많은 정신적 활동이 필요했습니까?", 7)
+        addLikertQuestion("frustration_mid", "좌절감: 과제를 수행하는 동안 얼마나 불안하고, 낙담하고, 짜증나고, 스트레스를 받았습니까?", 7)
+        addLikertQuestion("effort_mid", "노력: 과제에서 목표를 달성하기 위해 얼마나 열심히 노력해야 했습니까?", 7)
 
         // 추가 질문
         addSectionHeader("중간 평가")
@@ -169,16 +169,16 @@ class SelfReportActivity : AppCompatActivity() {
         addScaleDescription("전체 실험을 마친 현재 상태에 대해 질문합니다.\n0: 전혀 그렇지 않다 ~ 4: 매우 그렇다")
 
         pssQuestions.forEachIndexed { index, question ->
-            addLikertQuestion("pss_final_${index}", "${index}. $question", 4)
+            addLikertQuestion("pss_final_${index + 1}", "${index + 1}. $question", 5)
         }
 
         // NASA-TLX 3개 항목 (마지막 과제 대상)
-        addSectionHeader("NASA-TLX (마지막 3-Back 과제)")
-        addScaleDescription("방금 완료한 3-Back (2회차) 과제에 대해 평가해주세요.\n1: 매우 낮음 ~ 7: 매우 높음")
+        addSectionHeader("NASA-TLX (모두 마치고 나서)")
+        addScaleDescription("방금 완료한 과제에 대해 평가해주세요.\n1: 매우 낮음 ~ 7: 매우 높음")
 
-        addLikertQuestion("mental_demand_final", "정신적 요구도: 마지막 3-Back 과제를 수행하는 동안 얼마나 많은 정신적 활동이 필요했습니까?", 7)
-        addLikertQuestion("frustration_final", "좌절감: 마지막 3-Back 과제를 수행하는 동안 얼마나 불안하고, 낙담하고, 짜증나고, 스트레스를 받았습니까?", 7)
-        addLikertQuestion("effort_final", "노력: 마지막 3-Back 과제에서 목표를 달성하기 위해 얼마나 열심히 노력해야 했습니까?", 7)
+        addLikertQuestion("mental_demand_final", "정신적 요구도: 과제를 수행하는 동안 얼마나 많은 정신적 활동이 필요했습니까?", 7)
+        addLikertQuestion("frustration_final", "좌절감: 과제를 수행하는 동안 얼마나 불안하고, 낙담하고, 짜증나고, 스트레스를 받았습니까?", 7)
+        addLikertQuestion("effort_final", "노력: 과제에서 목표를 달성하기 위해 얼마나 열심히 노력해야 했습니까?", 7)
 
         // 전체 실험 평가
         addSectionHeader("전체 실험 종합 평가")
@@ -249,9 +249,15 @@ class SelfReportActivity : AppCompatActivity() {
         val radioGroup = RadioGroup(this).apply {
             orientation = RadioGroup.HORIZONTAL
             tag = key
+            contentDescription = "0부터 ${maxScale-1}까지의 척도 선택"
         }
 
-        for (i in 1..maxScale) {
+        // PSS-10의 경우 0부터 시작, 다른 척도는 1부터 시작
+        val isPSS = key.contains("pss_")
+        val startValue = if (isPSS) 0 else 1
+        val endValue = if (isPSS) maxScale - 1 else maxScale
+
+        for (i in startValue..endValue) {
             val radioButton = RadioButton(this).apply {
                 text = i.toString()
                 id = View.generateViewId()
@@ -260,13 +266,20 @@ class SelfReportActivity : AppCompatActivity() {
         }
 
         // 기본값 설정 (중간값)
-        val middleIndex = maxScale / 2
-        (radioGroup.getChildAt(middleIndex) as RadioButton).isChecked = true
-        surveyResponses[key] = middleIndex + 1
+        val middleIndex = if (isPSS) 2 else (maxScale / 2)
+        val defaultValue = if (isPSS) 2 else (middleIndex + 1)
+
+        if (isPSS) {
+            (radioGroup.getChildAt(2) as RadioButton).isChecked = true
+        } else {
+            (radioGroup.getChildAt(middleIndex) as RadioButton).isChecked = true
+        }
+        surveyResponses[key] = defaultValue
 
         radioGroup.setOnCheckedChangeListener { group, checkedId ->
             val selectedIndex = group.indexOfChild(group.findViewById(checkedId))
-            surveyResponses[key] = selectedIndex + 1
+            val selectedValue = if (isPSS) selectedIndex else selectedIndex + 1
+            surveyResponses[key] = selectedValue
         }
 
         container.addView(radioGroup)
