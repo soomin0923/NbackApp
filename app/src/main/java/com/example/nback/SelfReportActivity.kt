@@ -48,8 +48,8 @@ class SelfReportActivity : AppCompatActivity() {
     private fun determineSurveyType(): String {
         return when (blockNumber) {
             0 -> "baseline"
-            3 -> "middle"
-            5 -> "final"
+            4 -> "middle"
+            7 -> "final"
             else -> "baseline"
         }
     }
@@ -91,10 +91,10 @@ class SelfReportActivity : AppCompatActivity() {
 
         // PSS-10 척도 설명
         addSectionHeader("PSS-10 (지각된 스트레스 척도) - 기본 측정")
-        addScaleDescription("지난 한 달 동안의 전반적인 생활에 대해 질문합니다.\n1: 전혀 그렇지 않다 ~ 5: 매우 자주 그렇다")
+        addScaleDescription("지난 한 달 동안의 전반적인 생활에 대해 질문합니다.\n0: 전혀 그렇지 않다 ~ 4: 매우 자주 그렇다")
 
         pssQuestions.forEachIndexed { index, question ->
-            addLikertQuestion("pss_baseline_${index + 1}", "${index + 1}. $question", 5)
+            addLikertQuestion("pss_baseline_${index}", "${index}. $question", 4)
         }
 
         // 기본 정보
@@ -106,7 +106,7 @@ class SelfReportActivity : AppCompatActivity() {
     }
 
     private fun setupMiddleSurvey() {
-        titleText.text = "중간 설문조사 (Block 3 완료)"
+        titleText.text = "중간 설문조사 (Block 4 완료)"
 
         // PSS-10 질문들 (실험 과정 중 스트레스 - 수정된 문구)
         val pssQuestions = listOf(
@@ -123,26 +123,26 @@ class SelfReportActivity : AppCompatActivity() {
         )
 
         addSectionHeader("PSS-10 (실험 과정 중 스트레스 측정)")
-        addScaleDescription("지금까지 진행한 실험 과정에서의 경험에 대해 질문합니다.\n1: 전혀 그렇지 않다 ~ 5: 매우 자주 그렇다")
+        addScaleDescription("지금까지 진행한 실험 과정에서의 경험에 대해 질문합니다.\n0: 전혀 그렇지 않다 ~ 4: 매우 자주 그렇다")
 
         pssQuestions.forEachIndexed { index, question ->
-            addLikertQuestion("pss_middle_${index + 1}", "${index + 1}. $question", 5)
+            addLikertQuestion("pss_middle_${index}", "${index}. $question", 5)
         }
 
         // NASA-TLX 3개 항목
-        addSectionHeader("NASA-TLX (방금 완료한 2-Back 과제)")
-        addScaleDescription("방금 완료한 2-Back (1회차) 과제에 대해 평가해주세요.\n1: 매우 낮음 ~ 7: 매우 높음")
+        addSectionHeader("NASA-TLX (방금 완료한 3-Back 과제)")
+        addScaleDescription("방금 완료한 3-Back (1회차) 과제에 대해 평가해주세요.\n1: 매우 낮음 ~ 7: 매우 높음")
 
-        addLikertQuestion("mental_demand_mid", "정신적 요구도: 2-Back 과제를 수행하는 동안 얼마나 많은 정신적 활동이 필요했습니까?", 7)
-        addLikertQuestion("frustration_mid", "좌절감: 2-Back 과제를 수행하는 동안 얼마나 불안하고, 낙담하고, 짜증나고, 스트레스를 받았습니까?", 7)
-        addLikertQuestion("effort_mid", "노력: 2-Back 과제에서 목표를 달성하기 위해 얼마나 열심히 노력해야 했습니까?", 7)
+        addLikertQuestion("mental_demand_mid", "정신적 요구도: 3-Back 과제를 수행하는 동안 얼마나 많은 정신적 활동이 필요했습니까?", 7)
+        addLikertQuestion("frustration_mid", "좌절감: 3-Back 과제를 수행하는 동안 얼마나 불안하고, 낙담하고, 짜증나고, 스트레스를 받았습니까?", 7)
+        addLikertQuestion("effort_mid", "노력: 3-Back 과제에서 목표를 달성하기 위해 얼마나 열심히 노력해야 했습니까?", 7)
 
         // 추가 질문
         addSectionHeader("중간 평가")
         addMultipleChoiceQuestion("hardest_task_mid", "지금까지의 과제 중 가장 어려웠던 것은?",
-            listOf("0-back", "1-back (1회차)", "2-back (1회차)"))
+            listOf("0-back", "1-back (1회차)", "2-back (1회차)", "3-back (1회차)"))
         addMultipleChoiceQuestion("easiest_task_mid", "지금까지의 과제 중 가장 쉬웠던 것은?",
-            listOf("0-back", "1-back (1회차)", "2-back (1회차)"))
+            listOf("0-back", "1-back (1회차)", "2-back (1회차)", "3-back (1회차)"))
         addLikertQuestion("concentration_mid", "지금까지 실험에 대한 집중도는?", 7, "1: 전혀 집중 안됨 ~ 7: 매우 집중함")
         addLikertQuestion("current_fatigue_mid", "현재 피로도는?", 7, "1: 전혀 피곤하지 않음 ~ 7: 매우 피곤함")
         addLikertQuestion("motivation_mid", "앞으로 남은 실험을 계속할 의욕은?", 7, "1: 전혀 없음 ~ 7: 매우 높음")
@@ -166,23 +166,23 @@ class SelfReportActivity : AppCompatActivity() {
         )
 
         addSectionHeader("PSS-10 (최종 스트레스 수준 측정)")
-        addScaleDescription("전체 실험을 마친 현재 상태에 대해 질문합니다.\n1: 전혀 그렇지 않다 ~ 5: 매우 그렇다")
+        addScaleDescription("전체 실험을 마친 현재 상태에 대해 질문합니다.\n0: 전혀 그렇지 않다 ~ 4: 매우 그렇다")
 
         pssQuestions.forEachIndexed { index, question ->
-            addLikertQuestion("pss_final_${index + 1}", "${index + 1}. $question", 5)
+            addLikertQuestion("pss_final_${index}", "${index}. $question", 4)
         }
 
         // NASA-TLX 3개 항목 (마지막 과제 대상)
-        addSectionHeader("NASA-TLX (마지막 2-Back 과제)")
-        addScaleDescription("방금 완료한 2-Back (2회차) 과제에 대해 평가해주세요.\n1: 매우 낮음 ~ 7: 매우 높음")
+        addSectionHeader("NASA-TLX (마지막 3-Back 과제)")
+        addScaleDescription("방금 완료한 3-Back (2회차) 과제에 대해 평가해주세요.\n1: 매우 낮음 ~ 7: 매우 높음")
 
-        addLikertQuestion("mental_demand_final", "정신적 요구도: 마지막 2-Back 과제를 수행하는 동안 얼마나 많은 정신적 활동이 필요했습니까?", 7)
-        addLikertQuestion("frustration_final", "좌절감: 마지막 2-Back 과제를 수행하는 동안 얼마나 불안하고, 낙담하고, 짜증나고, 스트레스를 받았습니까?", 7)
-        addLikertQuestion("effort_final", "노력: 마지막 2-Back 과제에서 목표를 달성하기 위해 얼마나 열심히 노력해야 했습니까?", 7)
+        addLikertQuestion("mental_demand_final", "정신적 요구도: 마지막 3-Back 과제를 수행하는 동안 얼마나 많은 정신적 활동이 필요했습니까?", 7)
+        addLikertQuestion("frustration_final", "좌절감: 마지막 3-Back 과제를 수행하는 동안 얼마나 불안하고, 낙담하고, 짜증나고, 스트레스를 받았습니까?", 7)
+        addLikertQuestion("effort_final", "노력: 마지막 3-Back 과제에서 목표를 달성하기 위해 얼마나 열심히 노력해야 했습니까?", 7)
 
         // 전체 실험 평가
         addSectionHeader("전체 실험 종합 평가")
-        val allTasks = listOf("0-back", "1-back (1회차)", "2-back (1회차)", "1-back (2회차)", "2-back (2회차)")
+        val allTasks = listOf("0-back", "1-back (1회차)", "2-back (1회차)", "3-back (1회차)", "1-back (2회차)", "2-back (2회차)", "3-back (2회차)")
 
         addMultipleChoiceQuestion("hardest_overall", "전체 실험에서 가장 어려웠던 과제는?", allTasks)
         addMultipleChoiceQuestion("easiest_overall", "전체 실험에서 가장 쉬웠던 과제는?", allTasks)

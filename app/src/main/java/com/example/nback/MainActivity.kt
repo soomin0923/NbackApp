@@ -42,7 +42,7 @@ class MainActivity : AppCompatActivity() {
     private var currentStimulus = 0
     private var currentBlockName = ""
     private var currentBlockNumber = 1  // 현재 블록 번호 (1~5)
-    private val totalBlocks = 5  // 전체 블록 수
+    private val totalBlocks = 7  // 전체 블록 수
 
     // 데이터 저장
     private val experimentData = mutableListOf<TrialData>()
@@ -158,9 +158,9 @@ class MainActivity : AppCompatActivity() {
                 timerText.text = "사전 설문 완료! 실험을 시작하세요."
                 Toast.makeText(this, "사전 설문 완료! 0-Back 실험을 시작하세요.", Toast.LENGTH_LONG).show()
             }
-            3 -> {
+            4 -> {
                 // 중간 설문 완료 (Block 3 완료 후) → 1-back (2회차)로
-                currentBlockNumber = 4
+                currentBlockNumber = 5
                 currentN = 1
                 generateStimulusSequence(1)
                 updateInstructionText()
@@ -168,7 +168,7 @@ class MainActivity : AppCompatActivity() {
                 timerText.text = "중간 설문 완료! 다음 블록을 시작하세요."
                 Toast.makeText(this, "중간 설문 완료! 1-Back (2회차)을 시작하세요.", Toast.LENGTH_LONG).show()
             }
-            5 -> {
+            7 -> {
                 // 최종 설문 완료 (Block 5 완료 후) → 실험 완전 종료
                 saveDataToFile()
                 startButton.text = "실험 완료"
@@ -194,7 +194,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // N-back 시퀀스 생성 (원본 PsychoPy 코드 기반)
-    private fun generateStimulusSequence(n: Int, length: Int = 48, targetRatio: Float = 0.33f) {
+    private fun generateStimulusSequence(n: Int, length: Int = 30, targetRatio: Float = 0.33f) {
         stimulusList.clear()
         val digits = (0..9).toList()
         val numTargets = (length * targetRatio).toInt()
@@ -238,6 +238,7 @@ class MainActivity : AppCompatActivity() {
             0 -> "현재 화면에 표시되는\n 숫자를 써주세요"
             1 -> "1번째 이전에 표시된 \n 숫자를 써주세요"
             2 -> "2번째 이전에 표시된 \n 숫자를 써주세요"
+            3 -> "3번째 이전에 표시된 \n 숫자를 써주세요"
             else -> "N-Back 테스트"
         }
 
@@ -245,6 +246,7 @@ class MainActivity : AppCompatActivity() {
         val blockCount = when (currentN) {
             1 -> if (currentBlockNumber == 2) "1회차" else "2회차"
             2 -> if (currentBlockNumber == 3) "1회차" else "2회차"
+            3 -> if (currentBlockNumber == 4) "1회차" else "2회차"
             else -> ""
         }
 
@@ -460,8 +462,8 @@ class MainActivity : AppCompatActivity() {
         startButton.isEnabled = true
 
         // 블록 3, 5가 끝나면 설문조사로 이동 (블록 1은 제외)
-        if (currentBlockNumber == 3 || currentBlockNumber == 5) {
-            val surveyType = if (currentBlockNumber == 3) "middle" else "final"
+        if (currentBlockNumber == 4 || currentBlockNumber == 7) {
+            val surveyType = if (currentBlockNumber == 4) "middle" else "final"
 
             try {
                 val intent = Intent(this, SelfReportActivity::class.java).apply {
@@ -502,15 +504,35 @@ class MainActivity : AppCompatActivity() {
                 timerText.text = "1-Back (1회차) 완료!"
                 Toast.makeText(this, "1-Back (1회차) 완료! 2-Back (1회차)을 시작하세요.", Toast.LENGTH_LONG).show()
             }
-            4 -> {
+            3 -> {
                 // 1-back (2회차) 완료 → 2-back (2회차)로
-                currentBlockNumber = 5
+                currentBlockNumber = 4
+                currentN = 3
+                generateStimulusSequence(2)
+                updateInstructionText()
+                startButton.text = "3-Back (1회차) 시작"
+                timerText.text = "2-Back (1회차) 완료!"
+                Toast.makeText(this, "2-Back (1회차) 완료! 3-Back (1회차)을 시작하세요.", Toast.LENGTH_LONG).show()
+            }
+            5 -> {
+                // 1-back (1회차) 완료 → 2-back (1회차)로
+                currentBlockNumber = 6
                 currentN = 2
                 generateStimulusSequence(2)
                 updateInstructionText()
                 startButton.text = "2-Back (2회차) 시작"
                 timerText.text = "1-Back (2회차) 완료!"
-                Toast.makeText(this, "1-Back (2회차) 완료! 마지막 2-Back (2회차)을 시작하세요.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "1-Back (2회차) 완료! 2-Back (2회차)을 시작하세요.", Toast.LENGTH_LONG).show()
+            }
+            6 -> {
+                // 1-back (2회차) 완료 → 2-back (2회차)로
+                currentBlockNumber = 6
+                currentN = 3
+                generateStimulusSequence(2)
+                updateInstructionText()
+                startButton.text = "3-Back (2회차) 시작"
+                timerText.text = "2-Back (2회차) 완료!"
+                Toast.makeText(this, "2-Back (2회차) 완료! 3-Back (2회차)을 시작하세요.", Toast.LENGTH_LONG).show()
             }
         }
 
