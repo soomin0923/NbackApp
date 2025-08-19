@@ -132,26 +132,24 @@ class DrawingView(context: Context, attrs: AttributeSet) : View(context, attrs) 
     fun isUsingSPen(): Boolean = isUsingSPen
 
     // 캔버스를 PNG 파일로 저장
-    fun saveCanvasAsPNG(fileName: String, participantName: String = "Unknown"): Boolean {
+    fun saveCanvasAsPNG(fileName: String, directoryPath: String): Boolean {
         return try {
-            // Downloads 폴더에 nback_images 서브폴더 생성
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val imageDir = File(downloadsDir, "nback_images")
-            if (!imageDir.exists()) {
-                imageDir.mkdirs()
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            canvas.drawColor(Color.WHITE)
+            draw(canvas)
+
+            val directory = File(directoryPath)
+            if (!directory.exists()) {
+                directory.mkdirs()
             }
 
-            // PNG 파일로 저장 (참가자 이름 포함)
-            val finalFileName = "${participantName}_${fileName}"
-            val file = File(imageDir, "$finalFileName.png")
-            val fileOutputStream = FileOutputStream(file)
+            val file = File(directory, "$fileName.png")
+            FileOutputStream(file).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
 
-            // 현재 캔버스를 Bitmap으로 변환하여 저장
-            canvasBitmap.compress(Bitmap.CompressFormat.PNG, 100, fileOutputStream)
-            fileOutputStream.flush()
-            fileOutputStream.close()
-
-            Log.d("DrawingView", "Image saved: ${file.absolutePath}")
+            bitmap.recycle()
             true
         } catch (e: Exception) {
             Log.e("DrawingView", "Failed to save image: ${e.message}")

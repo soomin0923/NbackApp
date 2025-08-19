@@ -11,7 +11,7 @@
         android:id="@+id/titleBar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:background="#4ecdc4"
+        android:background="#1B8A85"
         android:orientation="vertical"
         android:padding="20dp"
         android:elevation="4dp"
@@ -23,7 +23,7 @@
             android:id="@+id/titleText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="self-report time"
+            android:text="현재 기분 설문"
             android:textColor="#ffffff"
             android:textSize="28sp"
             android:textStyle="bold"
@@ -34,7 +34,7 @@
             android:id="@+id/blockInfoText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="\n아래 질문들에 답해주세요."
+            android:text="지금 이 순간 느끼는 감정과 상태에 대해\n솔직하게 답해주세요."
             android:textColor="#ffffff"
             android:textSize="18sp"
             android:gravity="center" />
@@ -59,218 +59,73 @@
             android:elevation="2dp"
             android:padding="24dp">
 
-            <!-- 질문 1: 난이도 -->
+            <!-- 안내문구 -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="1. 이번 블록의 난이도는 어땠나요?"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="#333333"
-                android:layout_marginBottom="8dp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="1: 매우 쉬움 ← → 7: 매우 어려움"
-                android:textSize="14sp"
+                android:text="다음 문장들을 읽고, 지금 이 순간 자신의 감정과 가장 일치하는 정도를 선택해주세요."
+                android:textSize="16sp"
                 android:textColor="#666666"
-                android:layout_marginBottom="8dp" />
+                android:layout_marginBottom="24dp"
+                android:lineSpacingExtra="4dp" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <SeekBar
-                    android:id="@+id/difficultySeekBar"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="16dp" />
-
-                <TextView
-                    android:id="@+id/difficultyValueText"
-                    android:layout_width="32dp"
-                    android:layout_height="wrap_content"
-                    android:text="4"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:gravity="center" />
-
-            </LinearLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#e0e0e0"
-                android:layout_marginVertical="20dp" />
-
-            <!-- 질문 2: 집중도 -->
+            <!-- 질문 1: 차분함 (역문항) -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="2. 이번 블록 동안 얼마나 집중했나요?"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="#333333"
-                android:layout_marginBottom="8dp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="1: 전혀 집중 안됨 ← → 7: 매우 집중함"
-                android:textSize="14sp"
-                android:textColor="#666666"
-                android:layout_marginBottom="8dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <SeekBar
-                    android:id="@+id/concentrationSeekBar"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="16dp" />
-
-                <TextView
-                    android:id="@+id/concentrationValueText"
-                    android:layout_width="32dp"
-                    android:layout_height="wrap_content"
-                    android:text="4"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:gravity="center" />
-
-            </LinearLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#e0e0e0"
-                android:layout_marginVertical="20dp" />
-
-            <!-- 질문 3: 피로도 -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="3. 이번 블록 후 얼마나 피로한가요?"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="#333333"
-                android:layout_marginBottom="8dp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="1: 전혀 피로하지 않음 ← → 7: 매우 피로함"
-                android:textSize="14sp"
-                android:textColor="#666666"
-                android:layout_marginBottom="8dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <SeekBar
-                    android:id="@+id/fatigueSeekBar"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="16dp" />
-
-                <TextView
-                    android:id="@+id/fatigueValueText"
-                    android:layout_width="32dp"
-                    android:layout_height="wrap_content"
-                    android:text="4"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:gravity="center" />
-
-            </LinearLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#e0e0e0"
-                android:layout_marginVertical="20dp" />
-
-            <!-- 질문 4: 자신감 -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="4. 이번 블록에서 얼마나 잘했다고 생각하나요?"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="#333333"
-                android:layout_marginBottom="8dp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="1: 매우 못함 ← → 7: 매우 잘함"
-                android:textSize="14sp"
-                android:textColor="#666666"
-                android:layout_marginBottom="8dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <SeekBar
-                    android:id="@+id/confidenceSeekBar"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="16dp" />
-
-                <TextView
-                    android:id="@+id/confidenceValueText"
-                    android:layout_width="32dp"
-                    android:layout_height="wrap_content"
-                    android:text="4"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:gravity="center" />
-
-            </LinearLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#e0e0e0"
-                android:layout_marginVertical="20dp" />
-
-            <!-- 질문 5: 전략 -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="5. 이번 블록에서 어떤 전략을 사용했나요?"
+                android:text="1. 나는 차분하다"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:textColor="#333333"
                 android:layout_marginBottom="12dp" />
 
-            <EditText
-                android:id="@+id/strategyEditText"
+            <RadioGroup
+                android:id="@+id/calmRadioGroup"
                 android:layout_width="match_parent"
-                android:layout_height="100dp"
-                android:background="#f5f5f5"
-                android:padding="12dp"
-                android:gravity="start|top"
-                android:hint="예: 숫자를 소리내어 반복했다, 패턴을 찾으려고 했다 등"
-                android:textSize="16sp"
-                android:maxLines="4" />
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/calm1"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="1. 전혀 그렇지 않다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/calm2"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="2. 조금 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/calm3"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="3. 어느 정도 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/calm4"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="4. 매우 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+            </RadioGroup>
 
             <View
                 android:layout_width="match_parent"
@@ -278,26 +133,319 @@
                 android:background="#e0e0e0"
                 android:layout_marginVertical="20dp" />
 
-            <!-- 질문 6: 추가 의견 -->
+            <!-- 질문 2: 긴장감 -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="6. 추가로 하고 싶은 말이 있나요?"
+                android:text="2. 나는 긴장되어 있다"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:textColor="#333333"
                 android:layout_marginBottom="12dp" />
 
-            <EditText
-                android:id="@+id/additionalCommentsEditText"
+            <RadioGroup
+                android:id="@+id/tensionRadioGroup"
                 android:layout_width="match_parent"
-                android:layout_height="100dp"
-                android:background="#f5f5f5"
-                android:padding="12dp"
-                android:gravity="start|top"
-                android:hint="자유롭게 의견을 작성해주세요 (선택사항)"
-                android:textSize="16sp"
-                android:maxLines="4" />
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/tension1"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="1. 전혀 그렇지 않다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/tension2"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="2. 조금 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/tension3"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="3. 어느 정도 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/tension4"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="4. 매우 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+            </RadioGroup>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#e0e0e0"
+                android:layout_marginVertical="20dp" />
+
+            <!-- 질문 3: 편안함 (역문항) -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="3. 나는 편안하다"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:layout_marginBottom="12dp" />
+
+            <RadioGroup
+                android:id="@+id/relaxedRadioGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/relaxed1"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="1. 전혀 그렇지 않다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/relaxed2"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="2. 조금 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/relaxed3"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="3. 어느 정도 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/relaxed4"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="4. 매우 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+            </RadioGroup>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#e0e0e0"
+                android:layout_marginVertical="20dp" />
+
+            <!-- 질문 4: 걱정 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="4. 나는 걱정스럽다"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:layout_marginBottom="12dp" />
+
+            <RadioGroup
+                android:id="@+id/worriedRadioGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/worried1"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="1. 전혀 그렇지 않다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/worried2"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="2. 조금 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/worried3"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="3. 어느 정도 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/worried4"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="4. 매우 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+            </RadioGroup>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#e0e0e0"
+                android:layout_marginVertical="20dp" />
+
+            <!-- 질문 5: 만족감 (역문항) -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="5. 나는 만족스럽다"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:layout_marginBottom="12dp" />
+
+            <RadioGroup
+                android:id="@+id/satisfiedRadioGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/satisfied1"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="1. 전혀 그렇지 않다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/satisfied2"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="2. 조금 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/satisfied3"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="3. 어느 정도 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/satisfied4"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="4. 매우 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+            </RadioGroup>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#e0e0e0"
+                android:layout_marginVertical="20dp" />
+
+            <!-- 질문 6: 두려움 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="6. 나는 불안하다"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:layout_marginBottom="12dp" />
+
+            <RadioGroup
+                android:id="@+id/anxiousRadioGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/anxious1"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="1. 전혀 그렇지 않다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/anxious2"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="2. 조금 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/anxious3"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="3. 어느 정도 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <RadioButton
+                    android:id="@+id/anxious4"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="4. 매우 그렇다"
+                    android:textSize="16sp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+            </RadioGroup>
 
         </LinearLayout>
 
@@ -313,7 +461,7 @@
         android:textSize="20sp"
         android:textStyle="bold"
         android:textColor="#ffffff"
-        android:background="#4ecdc4"
+        android:background="#1B8A85"
         android:elevation="4dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"

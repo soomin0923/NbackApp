@@ -40,30 +40,30 @@
 
     <TextView
         android:id="@+id/progressText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="804dp"
+        android:layout_width="380dp"
+        android:layout_height="79dp"
         android:layout_marginTop="16dp"
-        android:background="#4ecdc4"
+        android:background="#f5f5f5"
         android:elevation="3dp"
         android:padding="12dp"
         android:text="시행: 0 / 30"
-        android:textColor="#ffffff"
-        android:textSize="16sp"
+        android:textColor="#000000"
+        android:textSize="24sp"
         android:textStyle="bold"
         app:layout_constraintBottom_toBottomOf="@+id/stimulusText"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="1.0"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/instructionText"
-        app:layout_constraintVertical_bias="0.069" />
+        app:layout_constraintVertical_bias="0.776" />
 
     <TextView
         android:id="@+id/stimulusText"
         android:layout_width="328dp"
         android:layout_height="181dp"
-        android:layout_marginTop="24dp"
         android:background="#f5f5f5"
         android:gravity="center"
-        android:text="15"
+        android:text="30"
         android:textColor="#000000"
         android:textSize="72sp"
         android:textStyle="bold"
@@ -125,15 +125,15 @@
 
     <TextView
         android:id="@+id/timerText"
-        android:layout_width="200dp"
-        android:layout_height="60dp"
+        android:layout_width="413dp"
+        android:layout_height="89dp"
         android:layout_marginTop="84dp"
         android:background="#333333"
         android:elevation="3dp"
         android:padding="12dp"
         android:text="타이머"
         android:textColor="#ffffff"
-        android:textSize="16sp"
+        android:textSize="28sp"
         android:textStyle="bold"
         app:layout_constraintBottom_toTopOf="@+id/skipTutorialButton"
         app:layout_constraintEnd_toStartOf="@+id/stimulusText"
@@ -145,15 +145,17 @@
         android:id="@+id/startButton"
         android:layout_width="179dp"
         android:layout_height="60dp"
-        android:layout_marginTop="64dp"
-        android:background="#4ecdc4"
+        android:background="#000000"
         android:text="실험 시작"
         android:textColor="#ffffff"
-        android:textSize="18sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.876"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/progressText" />
+        android:textSize="25sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toTopOf="@+id/canvasFrame"
+        app:layout_constraintEnd_toEndOf="@+id/canvasFrame"
+        app:layout_constraintHorizontal_bias="0.427"
+        app:layout_constraintStart_toStartOf="@+id/stimulusText"
+        app:layout_constraintTop_toBottomOf="@+id/stimulusText"
+        app:layout_constraintVertical_bias="0.592" />
 
     <Button
         android:id="@+id/skipTutorialButton"
@@ -162,6 +164,7 @@
         android:layout_marginTop="4dp"
         android:background="#dddddd"
         android:text="튜토리얼 건너뛰기"
+        android:visibility="invisible"
         android:textColor="#222222"
         android:textSize="16sp"
         app:layout_constraintEnd_toEndOf="parent"
@@ -177,12 +180,12 @@
         android:text="지우기"
         android:textColor="#ffffff"
         android:textSize="18sp"
-        app:layout_constraintBottom_toBottomOf="@+id/startButton"
-        app:layout_constraintEnd_toStartOf="@+id/startButton"
-        app:layout_constraintHorizontal_bias="0.457"
-        app:layout_constraintStart_toEndOf="@+id/stimulusText"
+        app:layout_constraintBottom_toBottomOf="@+id/canvasFrame"
+        app:layout_constraintEnd_toEndOf="@+id/progressText"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toEndOf="@+id/canvasFrame"
         app:layout_constraintTop_toBottomOf="@+id/progressText"
-        app:layout_constraintVertical_bias="1.0" />
+        app:layout_constraintVertical_bias="0.059" />
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>
