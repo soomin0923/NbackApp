@@ -30,8 +30,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var canvasHintText: TextView
     private lateinit var clearButton: Button
     private lateinit var startButton: Button
+    private lateinit var emergencyButton: Button
+    private lateinit var restartAppButton: Button
 
-    // ====== 추가된 데이터 관리 변수들 ======
+    // 데이터 관리 변수들
     private lateinit var participantBaseDir: File
     private lateinit var participantImagesDir: File
     private lateinit var participantResultsDir: File
@@ -41,7 +43,7 @@ class MainActivity : AppCompatActivity() {
     private var participantName = ""
     private var currentN = 0
     private var currentTrial = 0
-    private var totalTrials = 2 // 실제 실험용으로 30으로 변경 (테스트시 2로 설정)
+    private var totalTrials = 30 // 실제 실험용 (테스트시 2로 변경)
     private var stimulusList = mutableListOf<Int>()
     private var experimentStartTime = 0L
     private var isExperimentRunning = false
@@ -69,7 +71,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 화면 꺼짐 방지 및 가로 모드 유지
+        // 화면 꺼짐 방지 (자동 회전 허용)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         initializeViews()
@@ -78,10 +80,10 @@ class MainActivity : AppCompatActivity() {
         // Intent에서 participantName 받기
         participantName = intent.getStringExtra("participantName") ?: "Unknown_${System.currentTimeMillis()}"
 
-        // ====== 피험자 폴더 구조 초기화 ======
+        // 피험자 폴더 구조 초기화
         initializeParticipantDirectories()
 
-        // ====== 수정된 흐름 처리 ======
+        // 흐름 처리
         val resumeFromBlock = intent.getIntExtra("resumeFromBlock", -1)
 
         if (resumeFromBlock >= 0) {
@@ -90,45 +92,25 @@ class MainActivity : AppCompatActivity() {
             initializeParticipantDirectories()
             resumeFromSelfReport(resumeFromBlock)
         } else {
-            // ====== 처음 시작하는 경우 → ManualActivity로 이동 ======
+            // 처음 시작하는 경우 → ManualActivity로 이동
             startManualActivity()
         }
     }
 
-    // ====== ManualActivity로 이동하는 함수 ======
-    private fun startManualActivity() {
-        try {
-            val intent = Intent(this, ManualActivity::class.java).apply {
-                putExtra("participantName", participantName)
-            }
-            startActivity(intent)
-            finish() // MainActivity 종료
-        } catch (e: Exception) {
-            Log.e("NBack", "Failed to start Manual Activity: ${e.message}")
-            Toast.makeText(this, "매뉴얼 화면 로딩 실패. 설문조사로 이동합니다.", Toast.LENGTH_SHORT).show()
-            // Manual 실패시 바로 설문조사로
-            startBaselineSurvey()
-        }
-    }
-
-    // ====== 새로 추가된 함수: 피험자 폴더 구조 초기화 ======
     private fun initializeParticipantDirectories() {
         try {
             val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             val baseExperimentDir = File(downloadsDir, "nback_experiment_results")
 
-            // 기본 실험 폴더 생성
             if (!baseExperimentDir.exists()) {
                 baseExperimentDir.mkdirs()
             }
 
-            // 피험자별 기본 폴더 생성
             participantBaseDir = File(baseExperimentDir, participantName)
             if (!participantBaseDir.exists()) {
                 participantBaseDir.mkdirs()
             }
 
-            // 피험자별 하위 폴더들 생성
             participantImagesDir = File(participantBaseDir, "nback_images")
             participantResultsDir = File(participantBaseDir, "nback_results")
             participantSurveyDir = File(participantBaseDir, "survey_results")
@@ -145,41 +127,39 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // 새로 추가할 함수: baseline 설문조사 시작
-    private fun startBaselineSurvey() {
+    private fun startManualActivity() {
         try {
-            val intent = Intent(this, SelfReportActivity::class.java).apply {
-                putExtra("blockNumber", 0) // 0은 baseline을 의미
-                putExtra("blockName", "Baseline")
+            val intent = Intent(this, ManualActivity::class.java).apply {
                 putExtra("participantName", participantName)
-                putExtra("surveyType", "baseline") // 설문 타입 추가
             }
             startActivity(intent)
             finish() // MainActivity 종료
         } catch (e: Exception) {
+            Log.e("NBack", "Failed to start Manual Activity: ${e.message}")
+            Toast.makeText(this, "매뉴얼 화면 로딩 실패. 설문조사로 이동합니다.", Toast.LENGTH_SHORT).show()
+            startBaselineSurvey()
+        }
+    }
+
+    private fun startBaselineSurvey() {
+        try {
+            val intent = Intent(this, SelfReportActivity::class.java).apply {
+                putExtra("blockNumber", 0)
+                putExtra("blockName", "Baseline")
+                putExtra("participantName", participantName)
+                putExtra("surveyType", "baseline")
+            }
+            startActivity(intent)
+            finish()
+        } catch (e: Exception) {
             Log.e("NBack", "Failed to start baseline survey: ${e.message}")
             Toast.makeText(this, "설문조사 실패. 실험을 바로 시작합니다.", Toast.LENGTH_SHORT).show()
-            // 설문조사 실패시 바로 실험 시작
             startExperimentDirectly()
         }
     }
 
-    // ====== 새로 추가: 실험 직접 시작 준비 (Manual 완료 후 사용) ======
-    private fun prepareExperimentFromManual() {
-        currentBlockNumber = 1
-        currentN = 0
-        generateStimulusSequence(0)
-        updateInstructionText()
-        startButton.text = "0-Back 실험 시작"
-        timerText.text = "매뉴얼이 완료되었습니다. 버튼을 눌러 실험을 시작하세요!"
-        progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
-        startButton.isEnabled = true
-
-        Toast.makeText(this, "매뉴얼 완료! 이제 0-Back 실험을 시작할 수 있습니다.", Toast.LENGTH_LONG).show()
-    }
-    // 새로 추가할 함수: 설문조사 없이 바로 실험 시작
     private fun startExperimentDirectly() {
-        generateStimulusSequence(0) // 0-back부터 시작
+        generateStimulusSequence(0)
         updateInstructionText()
         progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
     }
@@ -193,6 +173,11 @@ class MainActivity : AppCompatActivity() {
         canvasHintText = findViewById(R.id.canvasHintText)
         clearButton = findViewById(R.id.clearButton)
         startButton = findViewById(R.id.startButton)
+        emergencyButton = findViewById(R.id.emergencyButton)
+        restartAppButton = findViewById(R.id.restartAppButton)
+
+        // 처음에는 앱 재시작 버튼 숨김
+        restartAppButton.visibility = View.GONE
 
         // 버튼 클릭 리스너 설정
         clearButton.setOnClickListener {
@@ -200,6 +185,8 @@ class MainActivity : AppCompatActivity() {
             canvasHintText.visibility = View.VISIBLE
         }
         startButton.setOnClickListener { startExperiment() }
+        emergencyButton.setOnClickListener { showEmergencyDialog() }
+        restartAppButton.setOnClickListener { restartApplication() }
 
         // 캔버스 터치 시 힌트 텍스트 숨기기
         drawingView.setOnTouchListener { _, _ ->
@@ -221,11 +208,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ====== 수정된 함수: 설문조사 후 복귀 처리 ======
     private fun resumeFromSelfReport(blockNumber: Int) {
         when (blockNumber) {
             0 -> {
-                // Baseline 설문 완료 → 실험 시작 (0-back)
                 currentBlockNumber = 1
                 currentN = 0
                 generateStimulusSequence(0)
@@ -233,10 +218,9 @@ class MainActivity : AppCompatActivity() {
                 startButton.text = "0-Back 시작"
                 timerText.text = "사전 설문 완료! 실험을 시작하세요."
                 Toast.makeText(this, "사전 설문 완료! 0-Back 실험을 시작하세요.", Toast.LENGTH_LONG).show()
-                startButton.isEnabled = true // 버튼 활성화
+                startButton.isEnabled = true
             }
             4 -> {
-                // 중간 설문 완료 (Block 4 완료 후) → 1-back (2회차)로 (수동 시작)
                 currentBlockNumber = 5
                 currentN = 1
                 generateStimulusSequence(1)
@@ -244,10 +228,9 @@ class MainActivity : AppCompatActivity() {
                 startButton.text = "1-Back (2회차) 시작"
                 timerText.text = "중간 설문 완료! 버튼을 눌러 다음 블록을 시작하세요."
                 Toast.makeText(this, "중간 설문 완료! 버튼을 눌러 1-Back (2회차)을 시작하세요.", Toast.LENGTH_LONG).show()
-                startButton.isEnabled = true // 버튼 활성화 (수동 시작)
+                startButton.isEnabled = true
             }
             7 -> {
-                // 최종 설문 완료 (Block 7 완료 후) → 실험 완전 종료
                 saveDataToFile()
                 startButton.text = "실험 완료"
                 startButton.isEnabled = false
@@ -256,7 +239,6 @@ class MainActivity : AppCompatActivity() {
                 return
             }
             else -> {
-                // 예상치 못한 경우 → 실험 시작
                 currentBlockNumber = 1
                 currentN = 0
                 generateStimulusSequence(0)
@@ -271,7 +253,170 @@ class MainActivity : AppCompatActivity() {
         progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
     }
 
-    // N-back 시퀀스 생성 (원본 PsychoPy 코드 기반)
+    // 긴급 옵션 다이얼로그
+    private fun showEmergencyDialog() {
+        val options = arrayOf(
+            "현재 블록 다시 시작",
+            "이전 블록으로 이동",
+            "특정 블록으로 이동",
+            "실험 처음부터 다시 시작",
+            "취소"
+        )
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle("긴급 옵션")
+            .setMessage("어떤 작업을 수행하시겠습니까?")
+            .setItems(options) { dialog, which ->
+                when (which) {
+                    0 -> restartCurrentBlock()
+                    1 -> moveToPreviousBlock()
+                    2 -> showBlockSelectionDialog()
+                    3 -> restartExperimentFromBeginning()
+                    4 -> dialog.dismiss()
+                }
+            }
+            .show()
+    }
+
+    private fun restartCurrentBlock() {
+        isExperimentRunning = false
+        currentTrial = 0
+        generateStimulusSequence(currentN)
+        updateInstructionText()
+
+        startButton.text = "${currentN}-Back 다시 시작"
+        startButton.isEnabled = true
+        timerText.text = "현재 블록을 다시 시작합니다."
+        progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
+
+        Toast.makeText(this, "현재 블록을 다시 시작합니다.", Toast.LENGTH_LONG).show()
+        Log.d("NBack", "Emergency restart: Block $currentBlockNumber ($currentN-back)")
+    }
+
+    private fun moveToPreviousBlock() {
+        if (currentBlockNumber > 1) {
+            currentBlockNumber--
+
+            currentN = when (currentBlockNumber) {
+                1 -> 0
+                2, 5 -> 1
+                3, 6 -> 2
+                4, 7 -> 3
+                else -> 0
+            }
+
+            currentTrial = 0
+            generateStimulusSequence(currentN)
+            updateInstructionText()
+
+            isExperimentRunning = false
+            startButton.text = "${currentN}-Back 시작"
+            startButton.isEnabled = true
+            timerText.text = "이전 블록으로 이동했습니다."
+            progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
+
+            Toast.makeText(this, "블록 $currentBlockNumber (${currentN}-Back)으로 이동했습니다.", Toast.LENGTH_LONG).show()
+            Log.d("NBack", "Emergency move to previous block: Block $currentBlockNumber ($currentN-back)")
+        } else {
+            Toast.makeText(this, "이미 첫 번째 블록입니다.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showBlockSelectionDialog() {
+        val blocks = arrayOf(
+            "블록 1: 0-Back",
+            "블록 2: 1-Back (1회차)",
+            "블록 3: 2-Back (1회차)",
+            "블록 4: 3-Back (1회차)",
+            "블록 5: 1-Back (2회차)",
+            "블록 6: 2-Back (2회차)",
+            "블록 7: 3-Back (2회차)"
+        )
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle("블록 선택")
+            .setMessage("이동할 블록을 선택하세요:")
+            .setItems(blocks) { dialog, which ->
+                moveToSpecificBlock(which + 1)
+            }
+            .setNegativeButton("취소") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun moveToSpecificBlock(blockNumber: Int) {
+        if (blockNumber in 1..7) {
+            currentBlockNumber = blockNumber
+
+            currentN = when (currentBlockNumber) {
+                1 -> 0
+                2, 5 -> 1
+                3, 6 -> 2
+                4, 7 -> 3
+                else -> 0
+            }
+
+            currentTrial = 0
+            generateStimulusSequence(currentN)
+            updateInstructionText()
+
+            isExperimentRunning = false
+            startButton.text = "${currentN}-Back 시작"
+            startButton.isEnabled = true
+            timerText.text = "선택한 블록으로 이동했습니다."
+            progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
+
+            Toast.makeText(this, "블록 $currentBlockNumber (${currentN}-Back)으로 이동했습니다.", Toast.LENGTH_LONG).show()
+            Log.d("NBack", "Emergency move to specific block: Block $currentBlockNumber ($currentN-back)")
+        }
+    }
+
+    private fun restartExperimentFromBeginning() {
+        android.app.AlertDialog.Builder(this)
+            .setTitle("실험 재시작 확인")
+            .setMessage("실험을 처음부터 다시 시작하시겠습니까?\n현재까지의 데이터는 유지됩니다.")
+            .setPositiveButton("재시작") { _, _ ->
+                currentBlockNumber = 1
+                currentN = 0
+                currentTrial = 0
+                isExperimentRunning = false
+
+                generateStimulusSequence(0)
+                updateInstructionText()
+
+                startButton.text = "0-Back 시작"
+                startButton.isEnabled = true
+                timerText.text = "실험을 처음부터 다시 시작합니다."
+                progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
+
+                Toast.makeText(this, "실험을 처음부터 다시 시작합니다.", Toast.LENGTH_LONG).show()
+                Log.d("NBack", "Emergency restart: Experiment restarted from beginning")
+            }
+            .setNegativeButton("취소") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun restartApplication() {
+        android.app.AlertDialog.Builder(this)
+            .setTitle("앱 재시작 확인")
+            .setMessage("새로운 참가자를 위해 앱을 재시작하시겠습니까?\n시작 화면으로 돌아갑니다.")
+            .setPositiveButton("재시작") { _, _ ->
+                val intent = Intent(this, StartActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                }
+                startActivity(intent)
+                finish()
+            }
+            .setNegativeButton("취소") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    // N-back 시퀀스 생성
     private fun generateStimulusSequence(n: Int, length: Int = 30, targetRatio: Float = 0.33f) {
         stimulusList.clear()
         val digits = (0..9).toList()
@@ -279,7 +424,6 @@ class MainActivity : AppCompatActivity() {
 
         when (n) {
             0 -> {
-                // 0-back: 특정 숫자(5)가 타겟
                 val targetDigit = 5
                 val targetPositions = (0 until length).shuffled().take(numTargets)
                 repeat(length) { i ->
@@ -290,17 +434,14 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             else -> {
-                // 1-back, 2-back, 3-back: N번째 이전과 동일한 숫자가 타겟
                 repeat(length) { stimulusList.add(digits.random()) }
                 val candidatePositions = (n until length).toList()
                 val targetPositions = candidatePositions.shuffled().take(numTargets)
 
-                // 타겟 위치에서 N번째 이전과 동일하게 설정
                 targetPositions.forEach { i ->
                     stimulusList[i] = stimulusList[i - n]
                 }
 
-                // 비타겟 위치에서 N번째 이전과 다르게 설정
                 val nonTargetPositions = candidatePositions - targetPositions.toSet()
                 nonTargetPositions.forEach { i ->
                     if (stimulusList[i] == stimulusList[i - n]) {
@@ -320,7 +461,6 @@ class MainActivity : AppCompatActivity() {
             else -> "N-Back 테스트"
         }
 
-        // 블록 번호 포함하여 표시
         val blockCount = when (currentN) {
             1 -> if (currentBlockNumber == 2) "1회차" else "2회차"
             2 -> if (currentBlockNumber == 3) "1회차" else "2회차"
@@ -347,15 +487,14 @@ class MainActivity : AppCompatActivity() {
         startButton.isEnabled = false
         startButton.text = "실험 진행 중..."
 
-        // 3초 카운트다운 후 시작
         showCountdown()
     }
 
     private fun showCountdown() {
-        var countdown = 3 // 3초로 수정 (원래 30이었음)
+        var countdown = 3
         timerText.text = "시작까지 $countdown 초"
 
-        val countdownTimer = object : CountDownTimer(3000, 1000) { // 3초로 수정
+        val countdownTimer = object : CountDownTimer(3000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 countdown = (millisUntilFinished / 1000).toInt() + 1
                 timerText.text = "시작까지 $countdown 초"
@@ -382,7 +521,6 @@ class MainActivity : AppCompatActivity() {
         progressText.text = "시행: ${currentTrial + 1} / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
         timerText.text = "숫자 제시 중..."
 
-        // 0.5초 동안 자극 제시
         object : CountDownTimer(500, 100) {
             override fun onTick(millisUntilFinished: Long) {}
             override fun onFinish() {
@@ -393,7 +531,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startResponsePeriod() {
-        val responseTime = 3000L // 3초
+        val responseTime = 3000L
 
         object : CountDownTimer(responseTime, 100) {
             override fun onTick(millisUntilFinished: Long) {
@@ -405,7 +543,6 @@ class MainActivity : AppCompatActivity() {
                 timerText.text = "시간 종료"
                 saveTrialData()
 
-                // 1초 후 다음 시행으로 진행
                 object : CountDownTimer(1000, 1000) {
                     override fun onTick(millisUntilFinished: Long) {}
                     override fun onFinish() {
@@ -419,17 +556,14 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    // ====== 수정된 함수: 시행 데이터 저장 ======
     private fun saveTrialData() {
         val recognizedText = drawingView.getRecognizedText()
         val correctAnswer = getCorrectAnswer()
 
-        // PNG 이미지 파일명 생성: [블록]_trial[번호]_stimulus[숫자]_[타임스탬프]
         val timestamp = System.currentTimeMillis()
         val imageFileName = "${currentBlockName}_trial${String.format("%02d", currentTrial + 1)}_" +
                 "stimulus${currentStimulus}_${timestamp}"
 
-        // ====== 수정: 캔버스를 PNG로 저장 (피험자 이미지 폴더에 저장) ======
         if (drawingView.hasUserDrawing()) {
             val imageSaved = drawingView.saveCanvasAsPNG(imageFileName, participantImagesDir.absolutePath)
             if (imageSaved) {
@@ -454,30 +588,24 @@ class MainActivity : AppCompatActivity() {
         )
 
         experimentData.add(trialData)
-
-        // 즉시 CSV에 저장 (데이터 손실 방지)
         saveTrialDataToCSV(trialData)
 
         Log.d("NBack", "Trial ${currentTrial + 1}: stimulus=$currentStimulus, correct=$correctAnswer, user=$recognizedText")
         Log.d("NBack", "Total trials saved so far: ${experimentData.size}")
     }
 
-    // ====== 수정된 함수: 각 시행마다 즉시 CSV에 저장 ======
     private fun saveTrialDataToCSV(trialData: TrialData) {
         try {
             val todayDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             val file = File(participantResultsDir, "nback_results_${participantName}_${todayDate}.csv")
 
-            // 파일이 없으면 헤더 추가
             val needsHeader = !file.exists()
 
             FileWriter(file, true).use { writer ->
                 if (needsHeader) {
-                    // ====== 수정: 헤더에 correct_answer와 user_answer 추가 ======
                     writer.write("participant,block,trial,n,stimulus,correct_answer,computer_time,timestamp,current_time,user_answer\n")
                 }
 
-                // ====== 수정: 데이터에 correct_answer와 user_answer 추가 ======
                 writer.write("${participantName},${trialData.block},${trialData.trial},${trialData.n},${trialData.stimulus}," +
                         "${trialData.correctAnswer},${trialData.computerTime},${trialData.timestamp},${trialData.currentTime},${trialData.userAnswer}\n")
                 writer.flush()
@@ -489,7 +617,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ====== 수정된 함수: 최종 데이터 저장 ======
     private fun saveDataToFile() {
         try {
             val finalTimestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
@@ -503,7 +630,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // ====== 수정: 저장된 파일들 개수 확인 ======
             val imageCount = if (participantImagesDir.exists()) participantImagesDir.listFiles()?.size ?: 0 else 0
             val csvCount = if (participantResultsDir.exists()) participantResultsDir.listFiles()?.filter { it.extension == "csv" }?.size ?: 0 else 0
             val surveyCount = if (participantSurveyDir.exists()) participantSurveyDir.listFiles()?.filter { it.extension == "csv" }?.size ?: 0 else 0
@@ -515,14 +641,18 @@ class MainActivity : AppCompatActivity() {
                     "- 그림 데이터: ${imageCount}개 이미지\n" +
                     "- 설문 결과: ${surveyCount}개 설문 파일\n" +
                     "총 시행 수: ${experimentData.size}\n" +
-                    "총 ${totalBlocks}개 블록 완료!"
+                    "총 ${totalBlocks}개 블록 완료!\n\n" +
+                    "새로운 참가자를 위해 앱을 재시작하세요."
 
             Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+
+            // 앱 재시작 버튼 표시
+            restartAppButton.visibility = View.VISIBLE
+            restartAppButton.text = "새 참가자를 위한 앱 재시작"
+            emergencyButton.visibility = View.GONE
+
             Log.d("NBack", "Final data saved to: ${finalFile.absolutePath}")
-            Log.d("NBack", "Participant folder: ${participantBaseDir.absolutePath}")
-            Log.d("NBack", "Total files - CSV: $csvCount, Images: $imageCount, Surveys: $surveyCount")
-            Log.d("NBack", "Total trials in final file: ${experimentData.size}")
-            Log.d("NBack", "Total blocks completed: $totalBlocks")
+            Log.d("NBack", "App restart button enabled")
 
         } catch (e: Exception) {
             Log.e("NBack", "데이터 저장 실패", e)
@@ -560,42 +690,32 @@ class MainActivity : AppCompatActivity() {
                     putExtra("surveyType", surveyType)
                 }
                 startActivity(intent)
-                finish() // MainActivity 종료
+                finish()
                 return
             } catch (e: Exception) {
                 Log.e("NBack", "Failed to start SelfReportActivity: ${e.message}")
                 Toast.makeText(this, "설문조사 화면 로딩 실패. 다음 블록으로 진행합니다.", Toast.LENGTH_SHORT).show()
-                // 설문조사 실패시 바로 다음 블록으로 진행
             }
         }
 
-        // 블록 1,2,3 완료 시 → 30초 휴식 후 자동으로 다음 블록 시작
-        if (currentBlockNumber in 1..3) {
-            startButton.isEnabled = false // 버튼 비활성화
+        // 블록 1,2,3,5,6 완료 시 → 30초 휴식 후 자동으로 다음 블록 시작
+        if (currentBlockNumber in 1..3 || currentBlockNumber in 5..6) {
+            startButton.isEnabled = false
             startAutoRestAndNextBlock()
             return
         }
 
-        // 블록 5,6 완료 시 → 30초 휴식 후 자동으로 다음 블록 시작
-        if (currentBlockNumber in 5..6) {
-            startButton.isEnabled = false // 버튼 비활성화
-            startAutoRestAndNextBlock()
-            return
-        }
-
-        // 기타 경우 (예상치 못한 상황) → 수동 시작
+        // 기타 경우
         startButton.isEnabled = true
         updateInstructionText()
         currentTrial = 0
         progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
     }
 
-    // 30초 휴식 후 자동으로 다음 블록 시작하는 함수
     private fun startAutoRestAndNextBlock() {
-        val restTime = 30000L // 30초로 수정 (실제 실험용)
+        val restTime = 30000L
         var timeLeft = restTime / 1000
 
-        // 현재 블록 완료 메시지 표시
         val currentBlockMessage = when (currentBlockNumber) {
             1 -> "0-Back 완료!"
             2 -> "1-Back (1회차) 완료!"
@@ -607,7 +727,6 @@ class MainActivity : AppCompatActivity() {
 
         Toast.makeText(this, "$currentBlockMessage 30초 후 다음 블록이 자동 시작됩니다.", Toast.LENGTH_LONG).show()
 
-        // 30초 카운트다운 타이머
         val restTimer = object : CountDownTimer(restTime, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 timeLeft = millisUntilFinished / 1000
@@ -616,14 +735,12 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onFinish() {
-                // 다음 블록 설정 및 자동 시작
                 setupNextBlock()
 
-                // 3초 후 자동으로 실험 시작 (3초로 수정)
                 timerText.text = "3초 후 자동 시작..."
                 startButton.text = "자동 시작 중..."
 
-                object : CountDownTimer(3000, 1000) { // 3초로 수정
+                object : CountDownTimer(3000, 1000) {
                     var countdown = 3
                     override fun onTick(millisUntilFinished: Long) {
                         countdown = (millisUntilFinished / 1000).toInt() + 1
@@ -631,7 +748,6 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     override fun onFinish() {
-                        // 자동으로 실험 시작
                         isExperimentRunning = true
                         experimentStartTime = System.currentTimeMillis()
                         startButton.text = "실험 진행 중..."
@@ -644,39 +760,33 @@ class MainActivity : AppCompatActivity() {
         restTimer.start()
     }
 
-    // 다음 블록 설정하는 함수
     private fun setupNextBlock() {
         when (currentBlockNumber) {
             1 -> {
-                // 0-back 완료 → 1-back (1회차)로
                 currentBlockNumber = 2
                 currentN = 1
                 generateStimulusSequence(1)
                 updateInstructionText()
             }
             2 -> {
-                // 1-back (1회차) 완료 → 2-back (1회차)로
                 currentBlockNumber = 3
                 currentN = 2
                 generateStimulusSequence(2)
                 updateInstructionText()
             }
             3 -> {
-                // 2-back (1회차) 완료 → 3-back (1회차)로
                 currentBlockNumber = 4
                 currentN = 3
                 generateStimulusSequence(3)
                 updateInstructionText()
             }
             5 -> {
-                // 1-back (2회차) 완료 → 2-back (2회차)로
                 currentBlockNumber = 6
                 currentN = 2
                 generateStimulusSequence(2)
                 updateInstructionText()
             }
             6 -> {
-                // 2-back (2회차) 완료 → 3-back (2회차)로
                 currentBlockNumber = 7
                 currentN = 3
                 generateStimulusSequence(3)

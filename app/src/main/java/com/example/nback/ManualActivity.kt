@@ -14,14 +14,14 @@ class ManualActivity : AppCompatActivity() {
     private lateinit var startButton: Button
     private lateinit var scrollView: ScrollView
 
-    // ====== 추가: 참가자 이름 변수 ======
+    // 참가자 이름 변수
     private var participantName = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_manual)
 
-        // ====== 추가: 참가자 이름 받기 ======
+        // 참가자 이름 받기
         participantName = intent.getStringExtra("participantName") ?: "Unknown"
 
         initializeViews()
@@ -119,17 +119,50 @@ class ManualActivity : AppCompatActivity() {
         
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
+        🆘 긴급 상황 대처 (실험 중 이용 가능)
+        • 우상단 "긴급" 버튼을 누르면:
+          - 현재 블록 다시 시작
+          - 이전 블록으로 이동
+          - 특정 블록 선택
+          - 실험 처음부터 재시작
+        • 문제 발생 시 언제든 사용하세요!
+        
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        📱 화면 회전
+        • 기기를 회전하면 자동으로 세로/가로 모드 전환
+        • 편안한 자세로 실험에 참여하세요
+        
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
         ⚠️ 주의사항
         • 실험 중에는 집중하여 참여해주세요
         • 각 블록은 연속으로 진행됩니다 (1→2→3→4)
         • 틀려도 괜찮으니 최선을 다해주세요
         • 휴대폰 알림 등을 미리 꺼주세요
         • 실험 중간에 휴식이 있으니 걱정하지 마세요
+        • 데이터는 실시간으로 저장되니 안전합니다
+        
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        💾 데이터 저장 위치
+        • Downloads/nback_experiment_results/$participantName/
+        • 실험 결과, 그림 데이터, 설문 결과가 분리 저장
+        • 각 시행마다 자동 백업
+        
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        🎁 실험 완료 후
+        • "새 참가자를 위한 앱 재시작" 버튼이 나타남
+        • 버튼을 누르면 시작 화면으로 돌아감
+        • 새로운 참가자도 바로 시작 가능
         
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
         ✅ 준비가 되셨다면 '실험 시작' 버튼을 눌러주세요!
         (매뉴얼 → 사전 설문 → 0-Back 실험 순서로 진행됩니다)
+        
+        실험자가 근처에 있으니 궁금한 점이 있으면 언제든 문의하세요!
         """.trimIndent()
 
         manualText.text = manualContent
@@ -137,16 +170,17 @@ class ManualActivity : AppCompatActivity() {
 
     private fun setupClickListeners() {
         backButton.setOnClickListener {
-            finish() // 이전 화면으로 돌아가기
+            // 이전 화면(StartActivity)으로 돌아가기
+            finish()
         }
 
-        // ====== 수정: 실험 시작 버튼 클릭 시 Baseline 설문으로 이동 ======
+        // 실험 시작 버튼 클릭 시 Baseline 설문으로 이동
         startButton.setOnClickListener {
             startBaselineSurvey()
         }
     }
 
-    // ====== 새로 추가: Baseline 설문조사 시작 함수 ======
+    // Baseline 설문조사 시작 함수
     private fun startBaselineSurvey() {
         val intent = Intent(this, SelfReportActivity::class.java).apply {
             putExtra("blockNumber", 0) // 0은 baseline을 의미

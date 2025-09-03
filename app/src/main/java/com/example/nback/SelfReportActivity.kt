@@ -20,7 +20,7 @@ class SelfReportActivity : AppCompatActivity() {
     private lateinit var questionsContainer: LinearLayout
     private lateinit var submitButton: Button
 
-    // ====== 추가된 변수 ======
+    // 데이터 관리 변수
     private lateinit var participantSurveyDir: File
 
     // 전달받은 데이터
@@ -55,7 +55,7 @@ class SelfReportActivity : AppCompatActivity() {
         participantName = intent.getStringExtra("participantName") ?: "Unknown"
         surveyType = intent.getStringExtra("surveyType") ?: determineSurveyType()
 
-        // ====== 추가된 초기화 ======
+        // 피험자 설문 폴더 초기화
         initializeParticipantSurveyDirectory()
 
         initializeViews()
@@ -64,7 +64,6 @@ class SelfReportActivity : AppCompatActivity() {
         updateBlockInfo()
     }
 
-    // ====== 새로 추가된 함수 ======
     private fun initializeParticipantSurveyDirectory() {
         try {
             val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
@@ -223,7 +222,7 @@ class SelfReportActivity : AppCompatActivity() {
         val desc = TextView(this).apply {
             text = description
             textSize = 14f
-            setTextColor(resources.getColor(android.R.color.darker_gray))
+            setTextColor(resources.getColor(android.R.color.darker_gray, null))
             setPadding(0, 0, 0, 20)
         }
         questionsContainer.addView(desc)
@@ -246,7 +245,7 @@ class SelfReportActivity : AppCompatActivity() {
             val scaleDesc = TextView(this).apply {
                 text = scaleDescription
                 textSize = 12f
-                setTextColor(resources.getColor(android.R.color.darker_gray))
+                setTextColor(resources.getColor(android.R.color.darker_gray, null))
                 setPadding(0, 0, 0, 8)
             }
             container.addView(scaleDesc)
@@ -258,7 +257,6 @@ class SelfReportActivity : AppCompatActivity() {
             contentDescription = "1부터 ${maxScale}까지의 척도 선택"
         }
 
-        // STAI는 1-4 척도, 다른 척도는 1부터 시작
         for (i in 1..maxScale) {
             val radioButton = RadioButton(this).apply {
                 text = i.toString()
@@ -412,15 +410,14 @@ class SelfReportActivity : AppCompatActivity() {
     private fun updateBlockInfo() {
         val description = when (surveyType) {
             "baseline" -> "실험 시작 전 기본 상태를 측정합니다.\nSTAI-State로 현재 불안/스트레스 수준을 조사합니다."
-            "middle" -> "실험 중간 평가입니다.\n현재 상태불안 수준과 과제 경험을 측정합니다.\n(0-back, 1-back, 2-back 1회차 완료)"
-            "final" -> "최종 평가입니다.\n전체 실험 완료 후의 상태불안과 종합적인 경험을 측정합니다.\n(모든 5개 블록 완료)"
+            "middle" -> "실험 중간 평가입니다.\n현재 상태불안 수준과 과제 경험을 측정합니다.\n(0-back, 1-back, 2-back, 3-back 1회차 완료)"
+            "final" -> "최종 평가입니다.\n전체 실험 완료 후의 상태불안과 종합적인 경험을 측정합니다.\n(모든 7개 블록 완료)"
             else -> "설문에 참여해주세요."
         }
 
         blockInfoText.text = description
     }
 
-    // ====== 수정된 설문 저장 함수 ======
     private fun saveSurveyData() {
         try {
             val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())

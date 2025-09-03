@@ -1,56 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    package="com.example.nback">
 
-    <!-- 권한 -->
+    <!-- 권한 설정 -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <application
         android:allowBackup="true"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar"
-        tools:targetApi="31">
+        android:theme="@style/AppTheme"
+        android:requestLegacyExternalStorage="true">
 
+        <!-- 시작 Activity (런처) -->
         <activity
-            android:name=".WelcomeActivity"
+            android:name=".StartActivity"
             android:exported="true"
-            android:screenOrientation="landscape"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+            android:screenOrientation="sensor"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- 메뉴얼 화면 -->
+        <!-- Manual Activity -->
         <activity
             android:name=".ManualActivity"
             android:exported="false"
-            android:screenOrientation="landscape"
-            android:parentActivityName=".WelcomeActivity"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+            android:screenOrientation="sensor"
+            android:parentActivityName=".StartActivity" />
 
-        <!-- 메인 실험 화면 -->
-        <activity
-            android:name=".MainActivity"
-            android:exported="false"
-            android:screenOrientation="landscape"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
-
-        <!-- 설문조사 화면 -->
+        <!-- 설문조사 Activity -->
         <activity
             android:name=".SelfReportActivity"
             android:exported="false"
-            android:screenOrientation="landscape"
-            android:parentActivityName=".MainActivity"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+            android:screenOrientation="sensor"
+            android:parentActivityName=".MainActivity" />
+
+        <!-- 메인 실험 Activity -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:screenOrientation="sensor"
+            android:parentActivityName=".StartActivity" />
 
     </application>
-
 </manifest>

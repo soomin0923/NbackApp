@@ -2,91 +2,146 @@ package com.example.nback
 
 import android.content.Context
 import android.graphics.*
-import android.os.Environment
 import android.util.AttributeSet
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import java.io.File
 import java.io.FileOutputStream
-import kotlin.random.Random
 
-class DrawingView(context: Context, attrs: AttributeSet) : View(context, attrs) {
+class DrawingView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : View(context, attrs, defStyleAttr) {
 
-    // 그리기 관련
-    private val paint = Paint().apply {
-        color = Color.BLACK
-        strokeWidth = 8f
-        style = Paint.Style.STROKE
-        strokeJoin = Paint.Join.ROUND
-        strokeCap = Paint.Cap.ROUND
-        isAntiAlias = true
+    // 그리기 관련 변수들
+    private var drawPath: Path = Path()
+    private var drawPaint: Paint = Paint()
+    private var canvasPaint: Paint = Paint(Paint.DITHER_FLAG)
+    private var drawCanvas: Canvas? = null
+    private var canvasBitmap: Bitmap? = null
+    private var paths: MutableList<Path> = mutableListOf()
+    private var paints: MutableList<Paint> = mutableListOf()
+
+    // 터치 관련 변수들
+    private var lastTouchX: Float = 0f
+    private var lastTouchY: Float = 0f
+    private val touchTolerance: Float = 4f
+
+    // 사용자 그림 여부 확인
+    private var hasDrawing: Boolean = false
+
+    // 비트맵 생성 상태 관리
+    private var bitmapReady: Boolean = false
+
+    init {
+        setupDrawing()
     }
 
-    private val canvasPaint = Paint(Paint.DITHER_FLAG)
-    private lateinit var drawCanvas: Canvas
-    private lateinit var canvasBitmap: Bitmap
-    private val path = Path()
-    private val strokes = mutableListOf<Path>()
-
-    // 손글씨 인식 관련
-    private var recognizedText = ""
-    private var hasDrawing = false
-
-    // S Pen 감지
-    private var isUsingSPen = false
+    private fun setupDrawing() {
+        drawPaint.apply {
+            color = Color.BLACK
+            isAntiAlias = true
+            strokeWidth = 8f
+            style = Paint.Style.STROKE
+            strokeJoin = Paint.Join.ROUND
+            strokeCap = Paint.Cap.ROUND
+        }
+    }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        canvasBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        drawCanvas = Canvas(canvasBitmap)
-        drawCanvas.drawColor(Color.WHITE)
+
+        Log.d("DrawingView", "onSizeChanged called: ${w}x${h} (old: ${oldw}x${oldh})")
+
+        // 크기가 유효하지 않으면 비트맵 생성하지 않음
+        if (w <= 0 || h <= 0) {
+            Log.w("DrawingView", "Invalid size in onSizeChanged: ${w}x${h}, skipping bitmap creation")
+            bitmapReady = false
+            return
+        }
+
+        // 기존 비트맵 해제
+        cleanupBitmap()
+
+        try {
+            canvasBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            drawCanvas = canvasBitmap?.let { Canvas(it) }
+            drawCanvas?.drawColor(Color.WHITE)
+            bitmapReady = true
+
+            Log.d("DrawingView", "Canvas bitmap created successfully: ${w}x${h}")
+        } catch (e: Exception) {
+            Log.e("DrawingView", "Failed to create canvas bitmap: ${e.message}")
+            bitmapReady = false
+            canvasBitmap = null
+            drawCanvas = null
+        }
+    }
+
+    private fun cleanupBitmap() {
+        canvasBitmap?.let {
+            if (!it.isRecycled) {
+                it.recycle()
+            }
+        }
+        canvasBitmap = null
+        drawCanvas = null
+        bitmapReady = false
+    }
+
+    // 비트맵이 준비되지 않았을 때 생성하는 함수
+    private fun ensureBitmapReady() {
+        if (!bitmapReady && width > 0 && height > 0) {
+            Log.d("DrawingView", "Late bitmap creation: ${width}x${height}")
+            onSizeChanged(width, height, 0, 0)
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        canvas.drawBitmap(canvasBitmap, 0f, 0f, canvasPaint)
-        canvas.drawPath(path, paint)
-    }
 
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        val x = event.x
-        val y = event.y
+        // 비트맵이 준비되지 않았으면 시도
+        if (!bitmapReady) {
+            ensureBitmapReady()
+        }
 
-        // S Pen 감지 및 필압 적용
-        when (event.getToolType(0)) {
-            MotionEvent.TOOL_TYPE_STYLUS -> {
-                isUsingSPen = true
-                val pressure = event.pressure
-                paint.strokeWidth = 6f + (pressure * 6f) // 6~12px
-                paint.color = Color.BLACK
-            }
-            MotionEvent.TOOL_TYPE_FINGER -> {
-                isUsingSPen = false
-                paint.strokeWidth = 10f
-                paint.color = Color.BLUE // 손가락은 파란색으로 구분
-            }
-            else -> {
-                paint.strokeWidth = 8f
-                paint.color = Color.BLACK
+        // 캔버스 비트맵 그리기
+        canvasBitmap?.let { bitmap ->
+            if (!bitmap.isRecycled && bitmapReady) {
+                canvas.drawBitmap(bitmap, 0f, 0f, canvasPaint)
             }
         }
 
+        // 현재 그리고 있는 경로 그리기
+        canvas.drawPath(drawPath, drawPaint)
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        // 비트맵이 준비되지 않았으면 준비 시도
+        if (!bitmapReady) {
+            ensureBitmapReady()
+        }
+
+        // 여전히 준비되지 않았으면 터치 이벤트 무시
+        if (!bitmapReady || drawCanvas == null) {
+            Log.w("DrawingView", "Canvas not ready, ignoring touch event")
+            return false
+        }
+
+        val touchX = event.x
+        val touchY = event.y
+
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                path.moveTo(x, y)
-                hasDrawing = true
+                touchStart(touchX, touchY)
             }
             MotionEvent.ACTION_MOVE -> {
-                path.lineTo(x, y)
+                touchMove(touchX, touchY)
             }
             MotionEvent.ACTION_UP -> {
-                drawCanvas.drawPath(path, paint)
-                strokes.add(Path(path))
-                path.reset()
-
-                // 간단한 숫자 인식 시도
-                recognizeNumber()
+                touchUp()
             }
         }
 
@@ -94,66 +149,186 @@ class DrawingView(context: Context, attrs: AttributeSet) : View(context, attrs) 
         return true
     }
 
-    // 간단한 숫자 인식 (실제 환경에서는 ML Kit 사용)
-    private fun recognizeNumber() {
-        if (!hasDrawing) {
-            recognizedText = ""
-            return
+    private fun touchStart(x: Float, y: Float) {
+        hasDrawing = true
+        drawPath.moveTo(x, y)
+        lastTouchX = x
+        lastTouchY = y
+    }
+
+    private fun touchMove(x: Float, y: Float) {
+        val dx = Math.abs(x - lastTouchX)
+        val dy = Math.abs(y - lastTouchY)
+
+        if (dx >= touchTolerance || dy >= touchTolerance) {
+            drawPath.quadTo(lastTouchX, lastTouchY, (x + lastTouchX) / 2, (y + lastTouchY) / 2)
+            lastTouchX = x
+            lastTouchY = y
+        }
+    }
+
+    private fun touchUp() {
+        drawPath.lineTo(lastTouchX, lastTouchY)
+
+        // 캔버스가 준비된 상태에서만 그리기
+        if (bitmapReady && drawCanvas != null) {
+            drawCanvas?.drawPath(drawPath, drawPaint)
+
+            // 경로와 페인트 저장
+            paths.add(Path(drawPath))
+            paints.add(Paint(drawPaint))
         }
 
-        // 더미 구현: 실제로는 ML Kit의 Digital Ink Recognition 사용
-        // 현재는 확률적으로 숫자 인식 시뮬레이션
-        val numbers = listOf("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
-
-        // 스트로크 수에 따른 숫자 추정 (매우 간단한 휴리스틱)
-        recognizedText = when (strokes.size) {
-            1 -> listOf("1", "7", "0").random()
-            2 -> listOf("2", "3", "4", "5", "6", "7", "9").random()
-            3 -> listOf("8", "4", "6", "9").random()
-            else -> numbers.random()
-        }
+        drawPath.reset()
     }
 
     fun clearCanvas() {
-        drawCanvas.drawColor(Color.WHITE)
-        strokes.clear()
-        path.reset()
-        recognizedText = ""
         hasDrawing = false
+        paths.clear()
+        paints.clear()
+        drawPath.reset()
+
+        // 비트맵이 준비된 상태에서만 지우기
+        if (bitmapReady && drawCanvas != null) {
+            drawCanvas?.drawColor(Color.WHITE)
+        }
+
         invalidate()
+        Log.d("DrawingView", "Canvas cleared")
+    }
+
+    fun hasUserDrawing(): Boolean {
+        return hasDrawing && paths.isNotEmpty()
     }
 
     fun getRecognizedText(): String {
-        return if (hasDrawing) recognizedText else ""
+        if (!hasUserDrawing()) {
+            return ""
+        }
+
+        // TODO: ML Kit Digital Ink Recognition 연동
+        return ""
     }
 
-    fun hasUserDrawing(): Boolean = hasDrawing
-
-    fun isUsingSPen(): Boolean = isUsingSPen
-
-    // 캔버스를 PNG 파일로 저장
+    // ====== 수정: 하나의 메서드만 유지하고 오버로드 제거 ======
     fun saveCanvasAsPNG(fileName: String, directoryPath: String): Boolean {
         return try {
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            canvas.drawColor(Color.WHITE)
-            draw(canvas)
+            // 현재 뷰 크기 확인
+            val viewWidth = width
+            val viewHeight = height
 
+            Log.d("DrawingView", "Attempting to save image: ${viewWidth}x${viewHeight}")
+
+            if (viewWidth <= 0 || viewHeight <= 0) {
+                Log.e("DrawingView", "Invalid view size for saving: ${viewWidth}x${viewHeight}")
+                return false
+            }
+
+            // 새로운 비트맵 생성해서 현재 뷰 그리기
+            val bitmap = Bitmap.createBitmap(viewWidth, viewHeight, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+
+            // 흰색 배경
+            canvas.drawColor(Color.WHITE)
+
+            // 저장된 모든 경로들 그리기
+            for (i in paths.indices) {
+                if (i < paints.size) {
+                    canvas.drawPath(paths[i], paints[i])
+                }
+            }
+
+            // 디렉토리 생성
             val directory = File(directoryPath)
             if (!directory.exists()) {
                 directory.mkdirs()
             }
 
+            // 파일 저장
             val file = File(directory, "$fileName.png")
             FileOutputStream(file).use { out ->
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
             }
 
             bitmap.recycle()
+
+            Log.d("DrawingView", "Image saved successfully: ${file.absolutePath}")
             true
+
         } catch (e: Exception) {
             Log.e("DrawingView", "Failed to save image: ${e.message}")
             false
         }
+    }
+
+    fun setBrushSize(newSize: Float) {
+        drawPaint.strokeWidth = newSize
+    }
+
+    fun setBrushColor(newColor: Int) {
+        drawPaint.color = newColor
+    }
+
+    fun undo() {
+        if (paths.isNotEmpty()) {
+            paths.removeAt(paths.size - 1)
+            paints.removeAt(paints.size - 1)
+
+            redrawCanvas()
+
+            if (paths.isEmpty()) {
+                hasDrawing = false
+            }
+        }
+    }
+
+    private fun redrawCanvas() {
+        if (bitmapReady && drawCanvas != null) {
+            drawCanvas?.drawColor(Color.WHITE)
+
+            for (i in paths.indices) {
+                if (i < paints.size) {
+                    drawCanvas?.drawPath(paths[i], paints[i])
+                }
+            }
+        }
+
+        invalidate()
+    }
+
+    fun getDrawingBounds(): RectF? {
+        if (!hasUserDrawing()) return null
+
+        val bounds = RectF()
+        for (path in paths) {
+            val pathBounds = RectF()
+            path.computeBounds(pathBounds, true)
+            if (bounds.isEmpty) {
+                bounds.set(pathBounds)
+            } else {
+                bounds.union(pathBounds)
+            }
+        }
+
+        return if (bounds.isEmpty) null else bounds
+    }
+
+    fun getDrawingComplexity(): Int {
+        return paths.size
+    }
+
+    fun getDrawingCoverageRatio(): Float {
+        val bounds = getDrawingBounds() ?: return 0f
+        val totalArea = width * height
+        if (totalArea <= 0) return 0f
+
+        val drawingArea = bounds.width() * bounds.height()
+        return drawingArea / totalArea
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        cleanupBitmap()
+        Log.d("DrawingView", "DrawingView detached and cleaned up")
     }
 }

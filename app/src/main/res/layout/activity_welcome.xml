@@ -122,7 +122,7 @@
             android:textSize="20sp"
             android:textStyle="bold"
             android:textColor="#ffffff"
-            android:background="@drawable/button_start"
+            android:background="@drawable/start_button"
             android:elevation="4dp" />
 
     </LinearLayout>

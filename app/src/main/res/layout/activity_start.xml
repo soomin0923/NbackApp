@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="32dp"
+    android:background="#F5F5F5">
+
+    <!-- 제목 -->
+    <TextView
+        android:id="@+id/titleText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="N-Back 실험에 오신 것을 환영합니다"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:textColor="#2C3E50"
+        android:gravity="center"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="60dp"
+        android:layout_marginBottom="40dp"
+        android:lineSpacingMultiplier="1.2" />
+
+    <!-- 설명 텍스트 -->
+    <TextView
+        android:id="@+id/instructionText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/titleText"
+        android:text="피험자 이름을 입력해주세요"
+        android:textSize="20sp"
+        android:textColor="#34495E"
+        android:gravity="center"
+        android:layout_marginBottom="32dp" />
+
+    <!-- 이름 입력 필드 -->
+    <EditText
+        android:id="@+id/participantNameEditText"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_below="@id/instructionText"
+        android:hint="예: 홍길동"
+        android:textSize="18sp"
+        android:padding="20dp"
+        android:layout_marginBottom="20dp"
+        android:background="@drawable/edittext_border"
+        android:imeOptions="actionDone"
+        android:inputType="textPersonName"
+        android:textColor="#2C3E50"
+        android:textColorHint="#7F8C8D"
+        android:gravity="center" />
+
+    <!-- 이름 확인 버튼 -->
+    <Button
+        android:id="@+id/confirmNameButton"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_below="@id/participantNameEditText"
+        android:text="이름 확인"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/button_primary"
+        android:layout_marginBottom="24dp"
+        android:elevation="4dp" />
+
+    <!-- Manual 시작 버튼 -->
+    <Button
+        android:id="@+id/manualButton"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:layout_below="@+id/confirmNameButton"
+        android:text="매뉴얼 및 실험 시작"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/button_secondary"
+        android:enabled="false"
+        android:elevation="6dp" />
+
+    <!-- 하단 안내 텍스트 -->
+    <TextView
+        android:id="@+id/bottomInfoText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:text="📌 실험 안내\n• 이름 확인 후 매뉴얼을 진행해주세요\n• 전체 실험은 약 60분 소요됩니다\n• 중간에 휴식 시간이 있습니다\n• 자동 회전이 가능합니다"
+        android:textSize="16sp"
+        android:textColor="#7F8C8D"
+        android:gravity="center"
+        android:lineSpacingMultiplier="1.4"
+        android:layout_marginBottom="20dp"
+        android:padding="20dp"
+        android:background="@drawable/info_background" />
+
+</RelativeLayout>
+
+    <!--
+    추가로 생성해야 할 drawable 파일들:
+
+    1. res/drawable/edittext_border.xml:
+    <?xml version="1.0" encoding="utf-8"?>
+    <shape xmlns:android="http://schemas.android.com/apk/res/android">
+        <solid android:color="#FFFFFF" />
+        <stroke
+            android:width="2dp"
+            android:color="#BDC3C7" />
+        <corners android:radius="12dp" />
+        <padding
+            android:left="16dp"
+            android:right="16dp"
+            android:top="16dp"
+            android:bottom="16dp" />
+    </shape>
+
+    2. res/drawable/button_primary.xml:
+    <?xml version="1.0" encoding="utf-8"?>
+    <selector xmlns:android="http://schemas.android.com/apk/res/android">
+        <item android:state_enabled="true">
+            <shape>
+                <solid android:color="#3498DB" />
+                <corners android:radius="12dp" />
+            </shape>
+        </item>
+        <item android:state_enabled="false">
+            <shape>
+                <solid android:color="#BDC3C7" />
+                <corners android:radius="12dp" />
+            </shape>
+        </item>
+    </selector>
+
+    3. res/drawable/button_secondary.xml:
+    <?xml version="1.0" encoding="utf-8"?>
+    <selector xmlns:android="http://schemas.android.com/apk/res/android">
+        <item android:state_enabled="true">
+            <shape>
+                <solid android:color="#27AE60" />
+                <corners android:radius="12dp" />
+            </shape>
+        </item>
+        <item android:state_enabled="false">
+            <shape>
+                <solid android:color="#95A5A6" />
+                <corners android:radius="12dp" />
+            </shape>
+        </item>
+    </selector>
+
+    4. res/drawable/info_background.xml:
+    <?xml version="1.0" encoding="utf-8"?>
+    <shape xmlns:android="http://schemas.android.com/apk/res/android">
+        <solid android:color="#ECF0F1" />
+        <corners android:radius="12dp" />
+        <stroke
+            android:width="1dp"
+            android:color="#D5DBDB" />
+    </shape>
+    -->
