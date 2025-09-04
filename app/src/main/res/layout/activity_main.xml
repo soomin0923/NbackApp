@@ -70,115 +70,116 @@
     </LinearLayout>
 
     <!-- 자극 제시 영역 (중앙 상단) -->
+    <!-- 자극 제시 영역: 정사각형 배경 제거 -->
     <RelativeLayout
         android:id="@+id/stimulusContainer"
-        android:layout_width="200dp"
-        android:layout_height="200dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:layout_below="@id/topInfoContainer"
-        android:layout_centerHorizontal="true"
         android:layout_marginTop="20dp"
-        android:background="@drawable/stimulus_background">
+        android:layout_centerHorizontal="true">
 
         <TextView
             android:id="@+id/stimulusText"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:text="7"
-            android:textSize="120sp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="6"
+            android:textSize="56sp"
             android:textStyle="bold"
-            android:textColor="#2C3E50"
-            android:gravity="center"
-            android:visibility="invisible" />
-
+            android:textColor="#000000"
+            android:layout_centerHorizontal="true"/>
     </RelativeLayout>
 
-    <!-- 그리기 영역 -->
-    <RelativeLayout
-        android:id="@+id/drawingContainer"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_below="@id/stimulusContainer"
-        android:layout_above="@id/controlButtonsContainer"
-        android:layout_marginTop="20dp"
-        android:layout_marginLeft="16dp"
-        android:layout_marginRight="16dp"
-        android:layout_marginBottom="16dp">
 
-        <!-- 그리기 뷰 -->
+    <!-- 그리기 영역 -->
+    <!-- 정사각형 그리기 캔버스 -->
+    <!-- 정사각형 그리기 캔버스: 버튼 줄 아래 -->
+    <FrameLayout
+        android:id="@+id/drawingContainer"
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:layout_below="@id/controlButtonsContainer"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="24dp"
+        android:background="@drawable/content_background">
+
         <com.example.nback.DrawingView
             android:id="@+id/drawingView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#FFFFFF"
-            android:elevation="4dp" />
+            android:background="#FFFFFF" />
 
-        <!-- 캔버스 힌트 텍스트 -->
         <TextView
             android:id="@+id/canvasHintText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center"
             android:text="여기에 숫자를 써주세요"
-            android:textSize="18sp"
-            android:textColor="#BDC3C7"
-            android:layout_centerInParent="true"
-            android:visibility="visible" />
+            android:textSize="16sp"
+            android:textColor="#AAAAAA"
+            android:clickable="false"
+            android:focusable="false"
+            android:enabled="false"/>
+    </FrameLayout>
 
-    </RelativeLayout>
+
 
     <!-- 컨트롤 버튼 영역 (하단) -->
+    <!-- 컨트롤 버튼 영역: 하단 고정 -->
+    <!-- 버튼 줄: 자극(stimulusContainer) 아래에 배치 -->
     <LinearLayout
         android:id="@+id/controlButtonsContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_above="@id/restartAppButton"
-        android:orientation="horizontal"
-        android:padding="16dp"
-        android:gravity="center">
+        android:layout_below="@id/stimulusContainer"
+        android:gravity="center"
+        android:layout_marginTop="15dp">
 
-        <!-- 지우기 버튼 -->
         <Button
             android:id="@+id/clearButton"
-            android:layout_width="0dp"
-            android:layout_height="56dp"
-            android:layout_weight="1"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:textSize="14sp"
             android:text="지우기"
-            android:textSize="16sp"
-            android:textStyle="bold"
             android:textColor="#FFFFFF"
             android:background="@drawable/clear_button"
-            android:layout_marginRight="12dp"
-            android:elevation="4dp" />
+            android:layout_marginEnd="10dp"/>
 
-        <!-- 시작 버튼 -->
         <Button
             android:id="@+id/startButton"
-            android:layout_width="0dp"
-            android:layout_height="56dp"
-            android:layout_weight="2"
-            android:text="실험 시작"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
             android:background="@drawable/start_button"
-            android:elevation="4dp" />
-
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="실험 시작"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
     </LinearLayout>
 
-    <!-- 앱 재시작 버튼 (실험 완료 후 표시) -->
+
+    <!-- 재시작 버튼은 필요 시만 보이게, 부모 하단 고정 -->
     <Button
         android:id="@+id/restartAppButton"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="60dp"
         android:text="새 참가자를 위한 앱 재시작"
-        android:textSize="18sp"
-        android:textStyle="bold"
         android:textColor="#FFFFFF"
         android:background="@drawable/restart_button"
         android:layout_alignParentBottom="true"
-        android:layout_margin="16dp"
-        android:elevation="6dp"
-        android:visibility="gone" />
+        android:visibility="gone"/>
+
+        <!-- 시작 버튼 -->
+
+
+
 
 </RelativeLayout>
 

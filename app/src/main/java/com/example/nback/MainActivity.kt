@@ -1,4 +1,6 @@
 package com.example.nback
+// 상단 import 추가
+import android.os.Build
 
 import android.Manifest
 import android.content.Intent
@@ -18,8 +20,44 @@ import java.io.FileWriter
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.random.Random
+import androidx.appcompat.app.AlertDialog
+import android.view.MotionEvent
+import androidx.annotation.RequiresApi
+import android.content.ContentValues
+import android.provider.MediaStore
+import java.io.*
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+
 
 class MainActivity : AppCompatActivity() {
+    // MainActivity 클래스 안에 필드로 추가
+    private var sessionId: String = ""      // 첫 초기화 때만 만들어 끝까지 재사용
+    private var didInitDirs: Boolean = false
+    // MainActivity 클래스 안에 추가
+    private fun restoreParticipantDirectories(baseDirPath: String) {
+        participantBaseDir = File(baseDirPath)
+        participantImagesDir = File(participantBaseDir, "nback_images").apply { mkdirs() }
+        nbackResultsFile = File(participantBaseDir, "nback_results.csv")
+        surveyResultsFile = File(participantBaseDir, "survey.csv")
+        didInitDirs = true
+        Log.d("NBack", "Restored dirs: ${participantBaseDir.absolutePath}")
+    }
+
+    // 실행 단계
+    private enum class Phase { NONE, COUNTDOWN, STIMULUS, RESPONSE, INTER_TRIAL, REST, AUTO_START }
+    private var currentPhase: Phase = Phase.NONE
+    private var isPaused = false
+    private var pausedPhase = Phase.NONE
+    private var pausedAtTrial = -1
+    private var pausedBlock = -1
+
+    private var countdownTimer: CountDownTimer? = null
+    private var stimulusTimer: CountDownTimer? = null
+    private var responseTimer: CountDownTimer? = null
+    private var interTrialTimer: CountDownTimer? = null
+    private var restTimer: CountDownTimer? = null
+    private var autoStartTimer: CountDownTimer? = null
 
     // UI 요소들
     private lateinit var drawingView: DrawingView
@@ -33,11 +71,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var emergencyButton: Button
     private lateinit var restartAppButton: Button
 
-    // 데이터 관리 변수들
+    // ▼ 변경: 단순화된 데이터 관리 변수들
     private lateinit var participantBaseDir: File
     private lateinit var participantImagesDir: File
-    private lateinit var participantResultsDir: File
-    private lateinit var participantSurveyDir: File
+    private lateinit var nbackResultsFile: File
+    private lateinit var surveyResultsFile: File
 
     // 실험 변수들
     private var participantName = ""
@@ -64,67 +102,227 @@ class MainActivity : AppCompatActivity() {
         val timestamp: Long,
         val currentTime: String,
         val computerTime: String,
-        val userAnswer: String
+        val userAnswer: String,
+        // ▼ 추가
+        val firstTouchTimeMs: Long,
+        val lastTouchTimeMs: Long,
+        val touchDurationMs: Long
     )
 
+
+    companion object {
+        // ▼ 추가: 다른 Activity들이 참조할 수 있도록 static 변수들 추가
+        @JvmStatic
+        var currentParticipantBaseDir: String = ""
+        @JvmStatic
+        var currentParticipantName: String = ""
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        // 화면 꺼짐 방지 (자동 회전 허용)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // ...
 
         initializeViews()
         requestPermissions()
 
-        // Intent에서 participantName 받기
         participantName = intent.getStringExtra("participantName") ?: "Unknown_${System.currentTimeMillis()}"
 
-        // 피험자 폴더 구조 초기화
-        initializeParticipantDirectories()
+        // 🔸 SelfReport 에서 넘겨준 기존 폴더 경로가 있으면 재사용
+        val returnedBaseDir = intent.getStringExtra("participantBaseDir")
+        if (!returnedBaseDir.isNullOrEmpty()) {
+            restoreParticipantDirectories(returnedBaseDir)
+        } else {
+            initializeParticipantDirectories()  // 기존대로 1회 초기화
+        }
 
-        // 흐름 처리
         val resumeFromBlock = intent.getIntExtra("resumeFromBlock", -1)
-
         if (resumeFromBlock >= 0) {
-            // 설문조사에서 돌아온 경우
             participantName = intent.getStringExtra("participantName") ?: participantName
-            initializeParticipantDirectories()
+            // ❗여기서 다시 initializeParticipantDirectories() 호출하지 말 것!
             resumeFromSelfReport(resumeFromBlock)
         } else {
-            // 처음 시작하는 경우 → ManualActivity로 이동
             startManualActivity()
         }
     }
 
+
+    // REPLACE: initializeParticipantDirectories()
     private fun initializeParticipantDirectories() {
-        try {
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val baseExperimentDir = File(downloadsDir, "nback_experiment_results")
-
-            if (!baseExperimentDir.exists()) {
-                baseExperimentDir.mkdirs()
-            }
-
-            participantBaseDir = File(baseExperimentDir, participantName)
-            if (!participantBaseDir.exists()) {
-                participantBaseDir.mkdirs()
-            }
-
-            participantImagesDir = File(participantBaseDir, "nback_images")
-            participantResultsDir = File(participantBaseDir, "nback_results")
-            participantSurveyDir = File(participantBaseDir, "survey_results")
-
-            if (!participantImagesDir.exists()) participantImagesDir.mkdirs()
-            if (!participantResultsDir.exists()) participantResultsDir.mkdirs()
-            if (!participantSurveyDir.exists()) participantSurveyDir.mkdirs()
-
-            Log.d("NBack", "Participant directories created: ${participantBaseDir.absolutePath}")
-
-        } catch (e: Exception) {
-            Log.e("NBack", "Failed to create participant directories: ${e.message}")
-            Toast.makeText(this, "폴더 생성 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+        // 이미 한 번 했으면 재진입 금지
+        if (didInitDirs && ::nbackResultsFile.isInitialized && nbackResultsFile.parentFile?.exists() == true) {
+            Log.d("NBack", "Dirs already initialized. Using: ${participantBaseDir.absolutePath}")
+            return
         }
+
+        val baseRoot = getExternalFilesDir(null) ?: filesDir
+        val baseExperimentDir = File(baseRoot, "nback_experiment_results").apply { mkdirs() }
+
+        // 세션 ID를 처음 한 번만 생성
+        if (sessionId.isEmpty()) {
+            sessionId = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
+        }
+        val participantDirName = "${participantName}_$sessionId"
+
+        participantBaseDir   = File(baseExperimentDir, participantDirName).apply { mkdirs() }
+        participantImagesDir = File(participantBaseDir, "nback_images").apply { mkdirs() }
+        nbackResultsFile     = File(participantBaseDir, "nback_results.csv")
+        surveyResultsFile    = File(participantBaseDir, "survey.csv")
+
+        didInitDirs = true
+
+        Log.d("NBack", "Init dirs (once): ${participantBaseDir.absolutePath}")
+        Toast.makeText(this, "저장 위치: ${participantBaseDir.absolutePath}", Toast.LENGTH_LONG).show()
+    }
+
+    // ▼ 변경: Downloads 폴더 접근을 위한 권한 요청 강화
+// REPLACE: requestPermissions()
+    private fun requestPermissions() {
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+            val perms = arrayOf(
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            )
+            val need = perms.any { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
+            if (need) ActivityCompat.requestPermissions(this, perms, 100)
+        }
+    }
+
+    // ▼ 권한 요청 결과 처리
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        if (requestCode == 100) {
+            val deniedPermissions = permissions.filterIndexed { index, _ ->
+                grantResults[index] != PackageManager.PERMISSION_GRANTED
+            }
+
+            if (deniedPermissions.isNotEmpty()) {
+                val message = "다음 권한이 거부되었습니다: ${deniedPermissions.joinToString(", ")}\n" +
+                        "실험 데이터가 앱 전용 폴더에 저장됩니다."
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                Log.w("NBack", "권한 거부됨: $deniedPermissions")
+            } else {
+                Toast.makeText(this, "권한이 허용되었습니다. Downloads 폴더에 저장됩니다.", Toast.LENGTH_SHORT).show()
+                Log.d("NBack", "모든 권한 허용됨")
+            }
+
+            if (!didInitDirs) {
+                initializeParticipantDirectories()
+            }
+        }
+    }
+
+    private fun pauseRun() {
+        if (isPaused) return
+        isPaused = true
+        pausedPhase = currentPhase
+        pausedAtTrial = currentTrial
+        pausedBlock = currentBlockNumber
+
+        cancelAllTimers()
+
+        startButton.text = "일시정지됨"
+        timerText.text = "긴급 일시정지"
+        Toast.makeText(this, "실험이 일시정지되었습니다.", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun resumeRun() {
+        if (!isPaused) return
+        isPaused = false
+        startButton.text = "실험 진행 중..."
+        // 재개 전 3초 카운트다운
+        showResumeCountdown {
+            when (pausedPhase) {
+                Phase.COUNTDOWN, Phase.STIMULUS, Phase.RESPONSE, Phase.INTER_TRIAL -> {
+                    // 같은 시행부터 다시 보여주고 응답시간 초기화
+                    showStimulusForCurrentTrial()
+                }
+                Phase.REST, Phase.AUTO_START -> {
+                    // 휴식 중이었으면 다음 블록으로 바로 진행(필요시 로직 변경)
+                    setupNextBlock()
+                    showCountdown()
+                }
+                else -> showNextStimulus()
+            }
+        }
+    }
+
+    private fun finishToStart() {
+        cancelAllTimers()
+        isPaused = false
+        // 시작 화면으로 이동 (패키지명/StartActivity 클래스명은 프로젝트 기준으로)
+        startActivity(Intent(this, StartActivity::class.java))
+        finish()
+    }
+
+    private fun showResumeCountdown(onFinished: () -> Unit) {
+        var left = 3
+        timerText.text = "재개까지 $left 초"
+        countdownTimer?.cancel()
+        countdownTimer = object : CountDownTimer(3000, 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                left = (millisUntilFinished / 1000).toInt() + 1
+                timerText.text = "재개까지 $left 초"
+            }
+            override fun onFinish() {
+                timerText.text = "재개!"
+                onFinished()
+            }
+        }.start()
+    }
+
+    /** 현재 trial부터 다시 진행(증분 없음) */
+    private fun showStimulusForCurrentTrial() {
+        // trial 범위 체크
+        if (currentTrial >= totalTrials || stimulusList.isEmpty()) {
+            finishCurrentBlock()
+            return
+        }
+        currentPhase = Phase.STIMULUS
+
+        currentStimulus = stimulusList[currentTrial]
+        stimulusText.text = currentStimulus.toString()
+        stimulusText.visibility = View.VISIBLE
+        progressText.text = "시행: ${currentTrial + 1} / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
+        timerText.text = "숫자 제시 중..."
+
+        stimulusTimer?.cancel()
+        stimulusTimer = object : CountDownTimer(500, 100) {
+            override fun onFinish() {
+                stimulusText.visibility = View.INVISIBLE
+                startResponsePeriod()  // 응답시간은 새로 부여
+            }
+            override fun onTick(millisUntilFinished: Long) {}
+        }.start()
+    }
+
+    private fun showEmergencyMenu() {
+        AlertDialog.Builder(this)
+            .setTitle("긴급 메뉴")
+            .setItems(arrayOf("이어하기", "현재 블록 다시 시작", "실험 종료")) { _, which ->
+                when (which) {
+                    0 -> resumeRun()
+                    1 -> restartCurrentBlock()
+                    2 -> finishToStart()
+                }
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    // ▼ 추가: 인덱스/리스트 가드
+    private fun ensureStimuliReady(): Boolean {
+        if (stimulusList.isEmpty()) {
+            Log.w("NBack", "Stimulus list empty. Regenerating for n=$currentN")
+            generateStimulusSequence(currentN)
+        }
+        if (currentTrial >= stimulusList.size) {
+            Log.w("NBack", "currentTrial=${currentTrial} out of bounds(size=${stimulusList.size}). Finishing block.")
+            return false
+        }
+        return true
     }
 
     private fun startManualActivity() {
@@ -148,6 +346,8 @@ class MainActivity : AppCompatActivity() {
                 putExtra("blockName", "Baseline")
                 putExtra("participantName", participantName)
                 putExtra("surveyType", "baseline")
+                putExtra("surveyFilePath", surveyResultsFile.absolutePath)
+                putExtra("participantBaseDir", participantBaseDir.absolutePath) // ✅ 추가
             }
             startActivity(intent)
             finish()
@@ -155,6 +355,22 @@ class MainActivity : AppCompatActivity() {
             Log.e("NBack", "Failed to start baseline survey: ${e.message}")
             Toast.makeText(this, "설문조사 실패. 실험을 바로 시작합니다.", Toast.LENGTH_SHORT).show()
             startExperimentDirectly()
+        }
+    }
+
+    // MainActivity.kt 내부에 추가
+    private fun ensureSurveyCsvHeader() {
+        try {
+            if (!::surveyResultsFile.isInitialized) return
+            if (!surveyResultsFile.exists()) {
+                surveyResultsFile.parentFile?.mkdirs()
+                surveyResultsFile.writeText(
+                    "participant,block,question_id,answer,current_time\n"
+                )
+                Log.d("NBack", "Survey CSV created with header: ${surveyResultsFile.absolutePath}")
+            }
+        } catch (e: Exception) {
+            Log.e("NBack", "Failed to ensure survey header: ${e.message}", e)
         }
     }
 
@@ -180,12 +396,26 @@ class MainActivity : AppCompatActivity() {
         restartAppButton.visibility = View.GONE
 
         // 버튼 클릭 리스너 설정
+        emergencyButton.setOnClickListener {
+            pauseRun()           // 타이머 전부 정지 + 상태 보관
+            showEmergencyMenu()  // 이어하기/다시시작/종료 선택
+        }
+
+        startButton.setOnClickListener {
+            // 실험 시작 상태로 전환
+            isExperimentRunning = true
+            drawingView.isEnabled = true
+            canvasHintText.visibility = View.GONE
+            startButton.text = "실험 진행 중..."
+            timerText.text = "실험 시작!"
+            // 기존에 쓰던 실험 시작/카운트다운 루틴 호출
+            showCountdown()  // 혹은 showNextStimulus() 등 네가 쓰는 함수
+        }
+
         clearButton.setOnClickListener {
             drawingView.clearCanvas()
             canvasHintText.visibility = View.VISIBLE
         }
-        startButton.setOnClickListener { startExperiment() }
-        emergencyButton.setOnClickListener { showEmergencyDialog() }
         restartAppButton.setOnClickListener { restartApplication() }
 
         // 캔버스 터치 시 힌트 텍스트 숨기기
@@ -195,19 +425,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun requestPermissions() {
-        val permissions = arrayOf(
-            Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        )
-
-        if (permissions.any {
-                ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-            }) {
-            ActivityCompat.requestPermissions(this, permissions, 100)
-        }
-    }
-
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun resumeFromSelfReport(blockNumber: Int) {
         when (blockNumber) {
             0 -> {
@@ -490,11 +708,14 @@ class MainActivity : AppCompatActivity() {
         showCountdown()
     }
 
+    // ▼ 변경: 카운트다운 타이머를 필드에 보관하고 재시작마다 취소
     private fun showCountdown() {
+        currentPhase = Phase.COUNTDOWN
+        countdownTimer?.cancel()
         var countdown = 3
         timerText.text = "시작까지 $countdown 초"
 
-        val countdownTimer = object : CountDownTimer(3000, 1000) {
+        countdownTimer = object : CountDownTimer(300, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 countdown = (millisUntilFinished / 1000).toInt() + 1
                 timerText.text = "시작까지 $countdown 초"
@@ -504,12 +725,17 @@ class MainActivity : AppCompatActivity() {
                 timerText.text = "실험 시작!"
                 showNextStimulus()
             }
-        }
-        countdownTimer.start()
+        }.start()
     }
 
+    // ▼ 변경: 인덱스 가드 & 타이머 보관
     private fun showNextStimulus() {
+        currentPhase = Phase.STIMULUS
         if (currentTrial >= totalTrials) {
+            finishCurrentBlock()
+            return
+        }
+        if (!ensureStimuliReady()) {
             finishCurrentBlock()
             return
         }
@@ -521,7 +747,8 @@ class MainActivity : AppCompatActivity() {
         progressText.text = "시행: ${currentTrial + 1} / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
         timerText.text = "숫자 제시 중..."
 
-        object : CountDownTimer(500, 100) {
+        stimulusTimer?.cancel()
+        stimulusTimer = object : CountDownTimer(500, 100) {
             override fun onTick(millisUntilFinished: Long) {}
             override fun onFinish() {
                 stimulusText.visibility = View.INVISIBLE
@@ -530,20 +757,26 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
+    // ▼ 변경: 타이머 보관 + 종료 후 다음 시행 타이머도 보관
     private fun startResponsePeriod() {
+        currentPhase = Phase.RESPONSE
+        drawingView.resetTouchCapture()
         val responseTime = 3000L
 
-        object : CountDownTimer(responseTime, 100) {
+        responseTimer?.cancel()
+        responseTimer = object : CountDownTimer(responseTime, 100) {
             override fun onTick(millisUntilFinished: Long) {
                 val secondsLeft = (millisUntilFinished / 1000) + 1
                 timerText.text = "답 작성 시간: ${secondsLeft}초"
             }
 
             override fun onFinish() {
+                currentPhase = Phase.INTER_TRIAL
                 timerText.text = "시간 종료"
                 saveTrialData()
 
-                object : CountDownTimer(1000, 1000) {
+                interTrialTimer?.cancel()
+                interTrialTimer = object : CountDownTimer(1000, 1000) {
                     override fun onTick(millisUntilFinished: Long) {}
                     override fun onFinish() {
                         drawingView.clearCanvas()
@@ -555,7 +788,6 @@ class MainActivity : AppCompatActivity() {
             }
         }.start()
     }
-
     private fun saveTrialData() {
         val recognizedText = drawingView.getRecognizedText()
         val correctAnswer = getCorrectAnswer()
@@ -571,9 +803,12 @@ class MainActivity : AppCompatActivity() {
             } else {
                 Log.e("NBack", "Failed to save image: $imageFileName.png")
             }
-        } else {
-            Log.d("NBack", "No drawing to save for trial ${currentTrial + 1}")
         }
+
+        // ▼ 추가: 컴퓨터 시간(epoch ms) 기준의 터치 타임
+        val firstMs = drawingView.getFirstTouchTimeMillis() ?: -1L
+        val lastMs  = drawingView.getLastTouchTimeMillis()  ?: -1L
+        val durationMs = if (firstMs > 0 && lastMs >= firstMs) lastMs - firstMs else 0L
 
         val trialData = TrialData(
             block = currentBlockName,
@@ -581,84 +816,165 @@ class MainActivity : AppCompatActivity() {
             n = currentN,
             stimulus = currentStimulus,
             correctAnswer = correctAnswer,
-            currentTime = "${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())}",
-            timestamp = timestamp - experimentStartTime,
-            computerTime = "${System.currentTimeMillis()}",
-            userAnswer = recognizedText
+            currentTime = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date()),
+            timestamp = timestamp,
+            computerTime = System.currentTimeMillis().toString(),
+            userAnswer = recognizedText,
+            // ▼ 추가 필드
+            firstTouchTimeMs = firstMs,
+            lastTouchTimeMs = lastMs,
+            touchDurationMs = durationMs
         )
 
         experimentData.add(trialData)
         saveTrialDataToCSV(trialData)
 
-        Log.d("NBack", "Trial ${currentTrial + 1}: stimulus=$currentStimulus, correct=$correctAnswer, user=$recognizedText")
-        Log.d("NBack", "Total trials saved so far: ${experimentData.size}")
+        Log.d("NBack", "Trial ${currentTrial + 1}: stimulus=$currentStimulus, correct=$correctAnswer, user=$recognizedText, first=$firstMs, last=$lastMs, dur=$durationMs")
     }
 
+    // REPLACE: saveTrialDataToCSV(...)
     private fun saveTrialDataToCSV(trialData: TrialData) {
         try {
-            val todayDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-            val file = File(participantResultsDir, "nback_results_${participantName}_${todayDate}.csv")
+            nbackResultsFile.parentFile?.mkdirs()
 
-            val needsHeader = !file.exists()
-
-            FileWriter(file, true).use { writer ->
+            val needsHeader = !nbackResultsFile.exists() || nbackResultsFile.length() == 0L
+            FileWriter(nbackResultsFile, true).use { writer ->
                 if (needsHeader) {
-                    writer.write("participant,block,trial,n,stimulus,correct_answer,computer_time,timestamp,current_time,user_answer\n")
+                    writer.write(
+                        "participant,block,trial,n,stimulus,correct_answer,computer_time,timestamp,current_time,user_answer," +
+                                "first_touch_time_ms,last_touch_time_ms,touch_duration_ms\n"
+                    )
                 }
 
-                writer.write("${participantName},${trialData.block},${trialData.trial},${trialData.n},${trialData.stimulus}," +
-                        "${trialData.correctAnswer},${trialData.computerTime},${trialData.timestamp},${trialData.currentTime},${trialData.userAnswer}\n")
-                writer.flush()
+                writer.write(
+                    "${participantName},${trialData.block},${trialData.trial},${trialData.n},${trialData.stimulus}," +
+                            "${trialData.correctAnswer},${trialData.computerTime},${trialData.timestamp},${trialData.currentTime},${trialData.userAnswer}," +
+                            "${trialData.firstTouchTimeMs},${trialData.lastTouchTimeMs},${trialData.touchDurationMs}\n"
+                )
             }
-
-            Log.d("NBack", "Trial data saved to CSV: ${file.absolutePath}")
+            Log.d("NBack", "[WRITE OK] ${nbackResultsFile.absolutePath} size=${nbackResultsFile.length()}")
         } catch (e: Exception) {
-            Log.e("NBack", "Failed to save trial data to CSV: ${e.message}")
+            Log.e("NBack", "[WRITE FAIL] nback_results.csv : ${e.message}", e)
+            Toast.makeText(this, "결과 저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
+
+    // ▼ 변경: 강화된 최종 저장 및 파일 검증
+    @RequiresApi(Build.VERSION_CODES.O)
+// REPLACE: saveDataToFile()
     private fun saveDataToFile() {
         try {
-            val finalTimestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
-            val finalFile = File(participantResultsDir, "nback_results_${participantName}_FINAL_${finalTimestamp}.csv")
+            // 핵심: nback_results.csv 존재/크기
+            val nbackExists = nbackResultsFile.exists()
+            val nbackSize   = if (nbackExists) nbackResultsFile.length() else 0L
 
-            FileWriter(finalFile).use { writer ->
-                writer.write("participant,block,trial,n,stimulus,correct_answer,computerTime,timestamp,current_time,user_answer\n")
-                experimentData.forEach { data ->
-                    writer.write("${participantName},${data.block},${data.trial},${data.n},${data.stimulus}," +
-                            "${data.correctAnswer},${data.computerTime},${data.timestamp},${data.currentTime},${data.userAnswer}\n")
-                }
+            // 참고 정보(경고로 취급하지 않음)
+            val imageCount  = if (::participantImagesDir.isInitialized && participantImagesDir.exists())
+                participantImagesDir.listFiles()?.size ?: 0 else 0
+            val surveyExists = surveyResultsFile.exists()
+            val surveySize   = if (surveyExists) surveyResultsFile.length() else 0L
+
+            // 요약 로그
+            Log.d("NBack", "=== FINAL SUMMARY ===")
+            Log.d("NBack", "Base: ${participantBaseDir.absolutePath}")
+            Log.d("NBack", "NBack CSV: $nbackExists, size=$nbackSize")
+            Log.d("NBack", "Survey CSV: $surveyExists, size=$surveySize")
+            Log.d("NBack", "Images: $imageCount")
+
+            // 사용자 메시지
+            val downloadsPath = "Downloads/NBack_Experiment_Results/${participantBaseDir.name}/"
+            val message = if (nbackExists && nbackSize > 0L) {
+                "✅ 전체 실험 완료!\n" +
+                        "참가자: $participantName\n" +
+                        "저장 위치: $downloadsPath\n" +
+                        "- N-Back 결과: 저장됨 (${nbackSize} bytes)\n" +
+                        "- 설문 결과: ${if (surveyExists) "있음" else "없음"} (${surveySize} bytes)\n" +
+                        "- 그림 데이터: ${imageCount}개\n" +
+                        "총 시행 수: ${experimentData.size}\n" +
+                        "총 ${totalBlocks}개 블록 완료!"
+            } else {
+                "⚠️ 핵심 결과 파일(nback_results.csv)이 비어있거나 없습니다.\n" +
+                        "참가자: $participantName\n" +
+                        "저장 위치: $downloadsPath\n" +
+                        "- N-Back 결과: ${if (nbackExists) "있음" else "없음"} (${nbackSize} bytes)\n" +
+                        "- 설문 결과: ${if (surveyExists) "있음" else "없음"} (${surveySize} bytes)\n" +
+                        "- 그림 데이터: ${imageCount}개\n" +
+                        "필요시 다시 실행해 주세요."
             }
-
-            val imageCount = if (participantImagesDir.exists()) participantImagesDir.listFiles()?.size ?: 0 else 0
-            val csvCount = if (participantResultsDir.exists()) participantResultsDir.listFiles()?.filter { it.extension == "csv" }?.size ?: 0 else 0
-            val surveyCount = if (participantSurveyDir.exists()) participantSurveyDir.listFiles()?.filter { it.extension == "csv" }?.size ?: 0 else 0
-
-            val message = "전체 실험 완료!\n" +
-                    "참가자: $participantName\n" +
-                    "저장 위치: ${participantBaseDir.name}/\n" +
-                    "- 실험 결과: ${csvCount}개 CSV 파일\n" +
-                    "- 그림 데이터: ${imageCount}개 이미지\n" +
-                    "- 설문 결과: ${surveyCount}개 설문 파일\n" +
-                    "총 시행 수: ${experimentData.size}\n" +
-                    "총 ${totalBlocks}개 블록 완료!\n\n" +
-                    "새로운 참가자를 위해 앱을 재시작하세요."
-
             Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 
-            // 앱 재시작 버튼 표시
+            // UI 마무리
             restartAppButton.visibility = View.VISIBLE
             restartAppButton.text = "새 참가자를 위한 앱 재시작"
             emergencyButton.visibility = View.GONE
 
-            Log.d("NBack", "Final data saved to: ${finalFile.absolutePath}")
-            Log.d("NBack", "App restart button enabled")
+            // 종료 시 ZIP 자동 내보내기
+            exportParticipantDataToDownloads()
 
         } catch (e: Exception) {
-            Log.e("NBack", "데이터 저장 실패", e)
-            Toast.makeText(this, "데이터 저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+            Log.e("NBack", "Finalization failed", e)
+            Toast.makeText(this, "데이터 정리 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+            exportParticipantDataToDownloads()
         }
     }
+
+    // ZIP 만들기
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun zipDir(srcDir: File, zipFile: File) {
+        ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFile))).use { zos ->
+            val base = srcDir.toPath()
+            srcDir.walkTopDown().filter { it.isFile }.forEach { f ->
+                val entryName = base.relativize(f.toPath()).toString()
+                zos.putNextEntry(ZipEntry(entryName))
+                FileInputStream(f).use { it.copyTo(zos) }
+                zos.closeEntry()
+            }
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun exportParticipantDataToDownloads() {
+        val baseDir = if (::participantBaseDir.isInitialized) participantBaseDir else return
+        Thread {
+            val outName = "nback_${participantName}_${System.currentTimeMillis()}.zip"
+            val tmpZip = File(cacheDir, outName).apply { if (exists()) delete() }
+            try {
+                // 1) 앱 전용 폴더 전체 ZIP
+                zipDir(baseDir, tmpZip)
+
+                // 2) MediaStore로 Downloads/NBack에 저장 (API 29+)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Downloads.DISPLAY_NAME, outName)
+                        put(MediaStore.Downloads.MIME_TYPE, "application/zip")
+                        put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/NBack")
+                    }
+                    val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    if (uri != null) {
+                        contentResolver.openOutputStream(uri)?.use { os ->
+                            FileInputStream(tmpZip).use { it.copyTo(os) }
+                        }
+                        runOnUiThread { Toast.makeText(this, "Downloads/NBack/$outName 으로 내보냈습니다.", Toast.LENGTH_LONG).show() }
+                    } else {
+                        runOnUiThread { Toast.makeText(this, "내보내기 실패(MediaStore).", Toast.LENGTH_SHORT).show() }
+                    }
+                } else {
+                    // API 28 이하
+                    val dl = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    val outDir = File(dl, "NBack").apply { mkdirs() }
+                    tmpZip.copyTo(File(outDir, outName), overwrite = true)
+                    runOnUiThread { Toast.makeText(this, "Downloads/NBack/$outName 으로 내보냈습니다.", Toast.LENGTH_LONG).show() }
+                }
+            } catch (e: Exception) {
+                runOnUiThread { Toast.makeText(this, "내보내기 오류: ${e.message}", Toast.LENGTH_LONG).show() }
+            } finally {
+                tmpZip.delete()
+            }
+        }.start()
+    }
+
+
 
     private fun getCorrectAnswer(): String {
         return when (currentN) {
@@ -688,10 +1004,11 @@ class MainActivity : AppCompatActivity() {
                     putExtra("blockName", currentBlockName)
                     putExtra("participantName", participantName)
                     putExtra("surveyType", surveyType)
+                    putExtra("surveyFilePath", surveyResultsFile.absolutePath)
+                    putExtra("participantBaseDir", participantBaseDir.absolutePath) // ✅ 추가
                 }
                 startActivity(intent)
                 finish()
-                return
             } catch (e: Exception) {
                 Log.e("NBack", "Failed to start SelfReportActivity: ${e.message}")
                 Toast.makeText(this, "설문조사 화면 로딩 실패. 다음 블록으로 진행합니다.", Toast.LENGTH_SHORT).show()
@@ -712,7 +1029,9 @@ class MainActivity : AppCompatActivity() {
         progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
     }
 
+    // ▼ 변경: 휴식/자동시작 타이머도 보관
     private fun startAutoRestAndNextBlock() {
+        currentPhase = Phase.REST
         val restTime = 30000L
         var timeLeft = restTime / 1000
 
@@ -727,7 +1046,8 @@ class MainActivity : AppCompatActivity() {
 
         Toast.makeText(this, "$currentBlockMessage 30초 후 다음 블록이 자동 시작됩니다.", Toast.LENGTH_LONG).show()
 
-        val restTimer = object : CountDownTimer(restTime, 1000) {
+        restTimer?.cancel()
+        restTimer = object : CountDownTimer(restTime, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 timeLeft = millisUntilFinished / 1000
                 timerText.text = "$currentBlockMessage\n다음 블록까지: ${timeLeft}초"
@@ -735,18 +1055,18 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onFinish() {
+                currentPhase = Phase.AUTO_START
                 setupNextBlock()
-
                 timerText.text = "3초 후 자동 시작..."
                 startButton.text = "자동 시작 중..."
 
-                object : CountDownTimer(3000, 1000) {
-                    var countdown = 3
+                autoStartTimer?.cancel()
+                autoStartTimer = object : CountDownTimer(3000, 1000) {
+                    var countdown = 0
                     override fun onTick(millisUntilFinished: Long) {
                         countdown = (millisUntilFinished / 1000).toInt() + 1
                         timerText.text = "자동 시작까지 $countdown 초"
                     }
-
                     override fun onFinish() {
                         isExperimentRunning = true
                         experimentStartTime = System.currentTimeMillis()
@@ -756,8 +1076,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }.start()
             }
-        }
-        restTimer.start()
+        }.start()
     }
 
     private fun setupNextBlock() {
@@ -796,5 +1115,20 @@ class MainActivity : AppCompatActivity() {
 
         currentTrial = 0
         progressText.text = "시행: 0 / $totalTrials (블록 $currentBlockNumber/$totalBlocks)"
+    }
+
+    // ▼ 추가: 생명주기에서 모든 타이머 취소
+    override fun onDestroy() {
+        cancelAllTimers()
+        super.onDestroy()
+    }
+
+    private fun cancelAllTimers() {
+        countdownTimer?.cancel()
+        stimulusTimer?.cancel()
+        responseTimer?.cancel()
+        interTrialTimer?.cancel()
+        restTimer?.cancel()
+        autoStartTimer?.cancel()
     }
 }

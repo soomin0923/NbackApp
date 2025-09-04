@@ -10,10 +10,30 @@ import java.io.File
 import java.io.FileOutputStream
 
 class DrawingView @JvmOverloads constructor(
+
+
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
+    // DrawingView 클래스 상단 필드에 추가
+    private var firstTouchMs: Long = 0L
+    private var lastTouchMs: Long = 0L
+
+    /** 새 trial의 응답 구간 시작 직전에 호출해서 타임스탬프를 초기화 */
+    fun resetTouchCapture() {
+        firstTouchMs = 0L
+        lastTouchMs = 0L
+    }
+
+    /** 첫 터치 시각(컴퓨터 시간, epoch ms). 터치 없으면 null */
+    fun getFirstTouchTimeMillis(): Long? = if (firstTouchMs == 0L) null else firstTouchMs
+    /** 마지막 터치 시각(컴퓨터 시간, epoch ms). 터치 없으면 null */
+    fun getLastTouchTimeMillis(): Long? = if (lastTouchMs == 0L) null else lastTouchMs
+
+    fun getTouchDurationMillis(): Long =
+        if (firstTouchMs > 0 && lastTouchMs >= firstTouchMs) lastTouchMs - firstTouchMs else 0L
+
 
     // 그리기 관련 변수들
     private var drawPath: Path = Path()
@@ -119,6 +139,7 @@ class DrawingView @JvmOverloads constructor(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+
         // 비트맵이 준비되지 않았으면 준비 시도
         if (!bitmapReady) {
             ensureBitmapReady()
@@ -132,15 +153,21 @@ class DrawingView @JvmOverloads constructor(
 
         val touchX = event.x
         val touchY = event.y
+        val now = System.currentTimeMillis()   // ▼ 컴퓨터 시간(절대시각)
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                // ▼ 첫 터치가 아니면 유지, 처음이면 기록
+                if (firstTouchMs == 0L) firstTouchMs = now
+                lastTouchMs = now
                 touchStart(touchX, touchY)
             }
             MotionEvent.ACTION_MOVE -> {
+                lastTouchMs = now
                 touchMove(touchX, touchY)
             }
-            MotionEvent.ACTION_UP -> {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                lastTouchMs = now
                 touchUp()
             }
         }

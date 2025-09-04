@@ -48,7 +48,7 @@
     <ScrollView
         android:id="@+id/scrollView"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_height="match_parent"
         android:layout_below="@id/headerContainer"
         android:layout_above="@id/startButton"
         android:background="@drawable/manual_content_background"
