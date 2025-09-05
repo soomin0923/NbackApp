@@ -10,7 +10,6 @@ import android.os.CountDownTimer
 import android.os.Environment
 import android.util.Log
 import android.view.View
-import android.view.WindowManager
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -19,9 +18,7 @@ import java.io.File
 import java.io.FileWriter
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.random.Random
 import androidx.appcompat.app.AlertDialog
-import android.view.MotionEvent
 import androidx.annotation.RequiresApi
 import android.content.ContentValues
 import android.provider.MediaStore
@@ -81,7 +78,7 @@ class MainActivity : AppCompatActivity() {
     private var participantName = ""
     private var currentN = 0
     private var currentTrial = 0
-    private var totalTrials = 30 // 실제 실험용 (테스트시 2로 변경)
+    private var totalTrials = 30
     private var stimulusList = mutableListOf<Int>()
     private var experimentStartTime = 0L
     private var isExperimentRunning = false
@@ -715,7 +712,7 @@ class MainActivity : AppCompatActivity() {
         var countdown = 3
         timerText.text = "시작까지 $countdown 초"
 
-        countdownTimer = object : CountDownTimer(300, 1000) {
+        countdownTimer = object : CountDownTimer(3000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 countdown = (millisUntilFinished / 1000).toInt() + 1
                 timerText.text = "시작까지 $countdown 초"
@@ -1062,10 +1059,10 @@ class MainActivity : AppCompatActivity() {
 
                 autoStartTimer?.cancel()
                 autoStartTimer = object : CountDownTimer(3000, 1000) {
-                    var countdown = 0
+                    var countdown = 3
                     override fun onTick(millisUntilFinished: Long) {
                         countdown = (millisUntilFinished / 1000).toInt() + 1
-                        timerText.text = "자동 시작까지 $countdown 초"
+                        timerText.text = "다음 task의 첫 번째 숫자 제시까지 $countdown 초"
                     }
                     override fun onFinish() {
                         isExperimentRunning = true

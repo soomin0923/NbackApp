@@ -23,7 +23,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="설문조사"
-            android:textSize="24sp"
+            android:textSize="28sp"
             android:textStyle="bold"
             android:textColor="#2C3E50"
             android:gravity="center"
@@ -37,7 +37,7 @@
             android:layout_height="wrap_content"
             android:text="설문에 참여해주세요."
             android:textSize="16sp"
-            android:textColor="#7F8C8D"
+            android:textColor="#FFFFFF"
             android:gravity="center"
             android:lineSpacingMultiplier="1.3" />
 
@@ -73,16 +73,16 @@
     <!-- 제출 버튼 -->
     <Button
         android:id="@+id/submitButton"
-        android:layout_width="match_parent"
+        android:layout_width="400dp"
         android:layout_height="64dp"
-        android:text="설문 완료"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:textColor="#FFFFFF"
-        android:background="@drawable/submit_button"
         android:layout_margin="16dp"
+        android:background="@drawable/submit_button"
         android:elevation="6dp"
-        />
+        android:text="설문 제출"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:layout_gravity="center"
+        android:textStyle="bold" />
 
 </LinearLayout>
 
