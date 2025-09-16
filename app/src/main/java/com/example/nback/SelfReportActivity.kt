@@ -199,11 +199,11 @@ class SelfReportActivity : AppCompatActivity() {
         addLikertQuestion("final_fatigue", "현재 피로도?", 7, "1: 전혀 ~ 7: 매우")
         addLikertQuestion("satisfaction", "만족도?", 7, "1: 매우 불만족 ~ 7: 매우 만족")
 
-        addSectionHeader("자유 응답")
-        addTextInputQuestion("strategy_overall", "사용한 전략/방법")
-        addTextInputQuestion("stress_coping", "스트레스/어려움 대처")
-        addTextInputQuestion("difficulty_change", "난이도/스트레스 변화")
-        addTextInputQuestion("feedback_final", "전반 소감/개선사항")
+        //addSectionHeader("자유 응답")
+        //addTextInputQuestion("strategy_overall", "사용한 전략/방법")
+        //addTextInputQuestion("stress_coping", "스트레스/어려움 대처")
+        //addTextInputQuestion("difficulty_change", "난이도/스트레스 변화")
+        //addTextInputQuestion("feedback_final", "전반 소감/개선사항")
     }
 
     private fun addSectionHeader(title: String) {
