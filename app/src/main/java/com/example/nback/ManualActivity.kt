@@ -1,11 +1,15 @@
 package com.example.nback
 
 import android.content.Intent
+import android.graphics.ImageDecoder
+import android.graphics.drawable.AnimatedImageDrawable
+import android.os.Build
 import android.os.Bundle
-import android.widget.Button
-import android.widget.ScrollView
-import android.widget.TextView
+import android.view.View
+import android.view.ViewGroup
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.setPadding
 
 class ManualActivity : AppCompatActivity() {
 
@@ -14,18 +18,26 @@ class ManualActivity : AppCompatActivity() {
     private lateinit var startButton: Button
     private lateinit var scrollView: ScrollView
 
-    // 참가자 이름 변수
     private var participantName = ""
+
+    // 토큰(이미지 삽입 지점)
+    private val CONFIG_IMG_TOK = "[[CONFIG_IMG]]"
+    private val EXPLAIN_IMG_TOK = "[[EXPLAIN_IMG]]"
+    private val EXPLAIN_GIF_TOK = "[[EXPLAIN_GIF]]"
+
+    // 리소스 파일명(확장자 제외)
+    private val CONFIG_IMAGE_NAME = "config_example"
+    private val EXPLAIN_IMAGE_NAME = "explain_example"
+    private val EXPLAIN_GIF_NAME   = "explain_anim" // drawable-nodpi/explain_anim.gif
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_manual)
 
-        // 참가자 이름 받기
         participantName = intent.getStringExtra("participantName") ?: "Unknown"
 
         initializeViews()
-        setupManualContent()
+        buildManualWithInlineImages() // ✅ 섹션 사이에 이미지/움짤 삽입
         setupClickListeners()
     }
 
@@ -36,7 +48,32 @@ class ManualActivity : AppCompatActivity() {
         scrollView = findViewById(R.id.scrollView)
     }
 
-    private fun setupManualContent() {
+    /**
+     * [실험 구성] 아래: (이미지)
+     * [설명] 아래: (이미지) (움짤)
+     * 그 다음 [입력 방법] 이어지는 UI 구성
+     */
+    private fun buildManualWithInlineImages() {
+        // 1) ScrollView 자식 확보/래핑
+        val firstChild = scrollView.getChildAt(0)
+        val container: ViewGroup = if (firstChild is ViewGroup) {
+            firstChild
+        } else {
+            val wrapper = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                setPadding(dp(16))
+            }
+            scrollView.removeAllViews()
+            if (firstChild != null) wrapper.addView(firstChild)
+            scrollView.addView(wrapper)
+            wrapper
+        }
+
+        // 2) 본문(토큰 포함)
         val manualContent = """
         📋 N-Back 실험 사용법
         
@@ -50,145 +87,164 @@ class ManualActivity : AppCompatActivity() {
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
         📝 실험 구성
-        • 총 7개 블록 (약 60분 소요)
-        • 각 블록당 30개 시행
-        • 블록별 난이도:
-          - 블록 1: 0-Back
-          - 블록 2: 1-Back (1회차)
-          - 블록 3: 2-Back (1회차)
-          - 블록 4: 3-Back (1회차)
-          - 블록 5: 1-Back (2회차)
-          - 블록 6: 2-Back (2회차)
-          - 블록 7: 3-Back (2회차)
+        $CONFIG_IMG_TOK
+        • 총 7개 블록 (약 20-30분 소요)
+        • 각 블록당 총 숫자 30개 제시
+            - [pre-survey]
+            - [1회차]
+            - 블록 1(0-back) -> 블록 2(1-back) -> 블록 3(2-back) -> 블록 4(3-back)
+            - [mid-survey]
+            - [2회차]
+            - 블록 5(1-back) -> 블록 6(2-back) -> 블록 7(3-back)
+            - [post-survey]
+
         
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
-        🔢 과제별 설명
+        🔢 설명
+        $EXPLAIN_IMG_TOK
+        (아래 예시 이미지를 참고하세요)
+        $EXPLAIN_GIF_TOK
         
-        【0-Back】
-        • 현재 화면에 표시되는 숫자를 그대로 써주세요
-        • 예: 화면에 '7'이 나오면 → '7'을 써주세요
-        
-        【1-Back】
-        • 1번째 이전에 표시된 숫자를 써주세요
-        • 예: 이전에 '3', 현재 '7' → '3'을 써주세요
-        
-        【2-Back】
-        • 2번째 이전에 표시된 숫자를 써주세요
-        • 예: 2번째 이전 '5', 1번째 이전 '3', 현재 '7' → '5'를 써주세요
-        
-        【3-Back】
-        • 3번째 이전에 표시된 숫자를 써주세요
-        • 예: 3번째 이전 '2', 2번째 이전 '5', 1번째 이전 '3', 현재 '7' → '2'를 써주세요
+        【0-Back】현재 숫자를 그대로 작성 / [1-Back】1개 전 숫자 작성 / [2-Back】2개 전 숫자 작성【/ 3-Back】3개 전 숫자 작성
         
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
         ✏️ 입력 방법
-        1. S Pen을 사용하여 흰색 캔버스에 숫자를 써주세요
-        2. 손가락으로도 입력 가능하지만 S Pen 사용을 권장합니다
-        3. 숫자는 0~9 사이의 한 자리 숫자입니다
-        4. 명확하고 크게 써주세요
-        5. 잘못 쓰셨다면 '지우기' 버튼을 누르고 다시 써주세요
+        1. 센서를 연결한 S-Pen 
+        2. 숫자는 0~9 (한 자리)
+        3. 명확하고 크게 작성
         
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
         ⏰ 시간 제한
         • 숫자 제시: 0.5초
-        • 답 작성 시간: 3초
-        • 각 시행 사이 간격: 1초
-        • 블록 간 휴식: 30초 (자동 진행)
-        
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        
-        📊 설문 조사
-        • 실험 시작 전: 기본 상태 측정 (STAI 설문)
-        • 블록 4 완료 후: 중간 평가 설문
-        • 블록 7 완료 후: 최종 평가 설문
-        
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        
-        🔄 실험 진행 순서
-        1. 매뉴얼 완료 (현재)
-        2. 사전 설문조사 (기본 상태 측정)
-        3. 0-Back 실험 시작
-        4. 블록 1→2→3→4 자동 진행
-        5. 중간 설문조사
-        6. 블록 5→6→7 진행
-        7. 최종 설문조사
-        8. 실험 완료
-        
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        
-        🆘 긴급 상황 대처 (실험 중 이용 가능)
-        • 우상단 "긴급" 버튼을 누르면:
-          - 현재 블록 다시 시작
-          - 이전 블록으로 이동
-          - 특정 블록 선택
-          - 실험 처음부터 재시작
-        • 문제 발생 시 언제든 사용하세요!
-        
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        
-        📱 화면 회전
-        • 기기를 회전하면 자동으로 세로/가로 모드 전환
-        • 편안한 자세로 실험에 참여하세요
-        
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        
-        ⚠️ 주의사항
-        • 실험 중에는 집중하여 참여해주세요
-        • 각 블록은 연속으로 진행됩니다 (1→2→3→4)
-        • 틀려도 괜찮으니 최선을 다해주세요
-        • 휴대폰 알림 등을 미리 꺼주세요
-        • 실험 중간에 휴식이 있으니 걱정하지 마세요
-        • 데이터는 실시간으로 저장되니 안전합니다
-        
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        
-        💾 데이터 저장 위치
-        • Downloads/nback_experiment_results/$participantName/
-        • 실험 결과, 그림 데이터, 설문 결과가 분리 저장
-        • 각 시행마다 자동 백업
-        
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        
-        🎁 실험 완료 후
-        • "새 참가자를 위한 앱 재시작" 버튼이 나타남
-        • 버튼을 누르면 시작 화면으로 돌아감
-        • 새로운 참가자도 바로 시작 가능
-        
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        
-        ✅ 준비가 되셨다면 '실험 시작' 버튼을 눌러주세요!
-        (매뉴얼 → 사전 설문 → 0-Back 실험 순서로 진행됩니다)
-        
-        실험자가 근처에 있으니 궁금한 점이 있으면 언제든 문의하세요!
+        • 답 작성: 3초
+        • 블록 간 휴식: 30초
         """.trimIndent()
 
-        manualText.text = manualContent
+        // 3) 토큰 이전/사이/이후 텍스트를 순차 배치
+        val partsA = manualContent.split(CONFIG_IMG_TOK, limit = 2)
+        val textBeforeConfig = partsA.getOrNull(0).orEmpty()
+        val afterConfig = partsA.getOrNull(1).orEmpty()
+
+        manualText.text = textBeforeConfig
+        var insertIndex = (container.indexOfChild(manualText).takeIf { it >= 0 } ?: container.childCount) + 1
+
+        // (이미지) — [실험 구성] 아래
+        val configImageView = makeStaticImageView(resolveDrawableId(CONFIG_IMAGE_NAME))
+        container.addView(configImageView, insertIndex++)
+
+        // CONFIG 이후 ~ EXPLAIN_IMG 전 텍스트
+        val partsB = afterConfig.split(EXPLAIN_IMG_TOK, limit = 2)
+        val textBeforeExplainImg = partsB.getOrNull(0).orEmpty()
+        val afterExplainImg = partsB.getOrNull(1).orEmpty()
+
+        container.addView(makeBodyTextView(textBeforeExplainImg), insertIndex++)
+
+        // (이미지) — [설명] 아래
+        val explainImageView = makeStaticImageView(resolveDrawableId(EXPLAIN_IMAGE_NAME))
+        container.addView(explainImageView, insertIndex++)
+
+        // EXPLAIN_IMG 이후 ~ EXPLAIN_GIF 전 텍스트
+        val partsC = afterExplainImg.split(EXPLAIN_GIF_TOK, limit = 2)
+        val textBeforeExplainGif = partsC.getOrNull(0).orEmpty()
+        val afterExplainGif = partsC.getOrNull(1).orEmpty()
+
+        container.addView(makeBodyTextView(textBeforeExplainGif), insertIndex++)
+
+        // (움짤) — [설명] 아래
+        val gifView = makeAnimatedImageView(resolveDrawableId(EXPLAIN_GIF_NAME))
+        container.addView(gifView, insertIndex++)
+
+        // 나머지 텍스트(= [입력 방법] 포함)
+        if (afterExplainGif.isNotBlank()) {
+            container.addView(makeBodyTextView(afterExplainGif), insertIndex)
+        }
     }
+
+    private fun makeBodyTextView(text: String): TextView =
+        TextView(this).apply {
+            id = View.generateViewId()
+            this.text = text
+            layoutParams = ViewGroup.MarginLayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+    /** 정적 이미지 뷰 (없는 경우 sample_nback_static로 대체) */
+    private fun makeStaticImageView(drawableId: Int): ImageView =
+        ImageView(this).apply {
+            id = View.generateViewId()
+            contentDescription = "예시 이미지"
+            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            layoutParams = ViewGroup.MarginLayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(8)
+                bottomMargin = dp(12)
+            }
+            setImageResource(if (drawableId != 0) drawableId else R.drawable.sample_nback_static)
+        }
+
+    /** GIF/애니 WebP 뷰 (API 28+ 자동 재생, 미만은 정지 이미지 대체) */
+    private fun makeAnimatedImageView(drawableId: Int): ImageView =
+        ImageView(this).apply {
+            id = View.generateViewId()
+            contentDescription = "예시 움짤"
+            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            layoutParams = ViewGroup.MarginLayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(4)
+                bottomMargin = dp(16)
+            }
+
+            if (drawableId == 0) {
+                setImageResource(R.drawable.sample_nback_static)
+                return@apply
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                try {
+                    val src = ImageDecoder.createSource(resources, drawableId)
+                    val dr = ImageDecoder.decodeDrawable(src)
+                    setImageDrawable(dr)
+                    if (dr is AnimatedImageDrawable) dr.start()
+                } catch (_: Throwable) {
+                    setImageResource(R.drawable.sample_nback_static)
+                }
+            } else {
+                // 필요하면 Glide/Coil로 대체 가능
+                setImageResource(R.drawable.sample_nback_static)
+            }
+        }
+
+    /** 파일명이 존재하면 drawable id, 없으면 0 반환 */
+    private fun resolveDrawableId(name: String): Int =
+        resources.getIdentifier(name, "drawable", packageName)
 
     private fun setupClickListeners() {
-        backButton.setOnClickListener {
-            // 이전 화면(StartActivity)으로 돌아가기
-            finish()
-        }
-
-        // 실험 시작 버튼 클릭 시 Baseline 설문으로 이동
-        startButton.setOnClickListener {
-            startBaselineSurvey()
-        }
+        backButton.setOnClickListener { finish() }
+        startButton.setOnClickListener { startBaselineSurvey() }
     }
 
-    // Baseline 설문조사 시작 함수
     private fun startBaselineSurvey() {
         val intent = Intent(this, SelfReportActivity::class.java).apply {
-            putExtra("blockNumber", 0) // 0은 baseline을 의미
+            putExtra("blockNumber", 0)
             putExtra("blockName", "Baseline")
             putExtra("participantName", participantName)
             putExtra("surveyType", "baseline")
         }
         startActivity(intent)
-        finish() // ManualActivity 종료
+        finish()
     }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 }
