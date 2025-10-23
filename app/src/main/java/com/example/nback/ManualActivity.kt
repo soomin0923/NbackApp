@@ -5,6 +5,7 @@ import android.graphics.ImageDecoder
 import android.graphics.drawable.AnimatedImageDrawable
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
@@ -35,6 +36,8 @@ class ManualActivity : AppCompatActivity() {
         setContentView(R.layout.activity_manual)
 
         participantName = intent.getStringExtra("participantName") ?: "Unknown"
+        Log.d("Manual", "=== ManualActivity Started ===")
+        Log.d("Manual", "Participant: $participantName")
 
         initializeViews()
         buildManualWithInlineImages() // ✅ 섹션 사이에 이미지/움짤 삽입
@@ -79,14 +82,14 @@ class ManualActivity : AppCompatActivity() {
         
         안녕하세요, $participantName 님! 실험에 참여해주셔서 감사합니다.
         
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
         🎯 실험 목적
         작업 기억(Working Memory) 능력을 측정하는 인지 실험입니다.
         
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
-        📝 실험 구성
+        📊 실험 구성
         $CONFIG_IMG_TOK
         • 총 7개 블록 (약 20-30분 소요)
         • 각 블록당 총 숫자 30개 제시
@@ -99,28 +102,33 @@ class ManualActivity : AppCompatActivity() {
             - [post-survey]
 
         
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
-        🔢 설명
+        📢 설명
         $EXPLAIN_IMG_TOK
         (아래 예시 이미지를 참고하세요)
         $EXPLAIN_GIF_TOK
         
-        【0-Back】현재 숫자를 그대로 작성 / [1-Back】1개 전 숫자 작성 / [2-Back】2개 전 숫자 작성【/ 3-Back】3개 전 숫자 작성
+        【0-Back】현재 숫자를 그대로 작성 / 【1-Back】1개 전 숫자 작성 / 【2-Back】2개 전 숫자 작성】/ 【3-Back】3개 전 숫자 작성
         
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
         ✏️ 입력 방법
         1. 센서를 연결한 S-Pen 
         2. 숫자는 0~9 (한 자리)
         3. 명확하고 크게 작성
         
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
         ⏰ 시간 제한
         • 숫자 제시: 0.5초
         • 답 작성: 3초
         • 블록 간 휴식: 30초
+        
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        준비가 되셨으면 '시작' 버튼을 눌러주세요.
+        먼저 연습 단계를 거친 후 본 실험이 진행됩니다.
         """.trimIndent()
 
         // 3) 토큰 이전/사이/이후 텍스트를 순차 배치
@@ -167,6 +175,7 @@ class ManualActivity : AppCompatActivity() {
         TextView(this).apply {
             id = View.generateViewId()
             this.text = text
+            textSize = 14f
             layoutParams = ViewGroup.MarginLayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -188,6 +197,8 @@ class ManualActivity : AppCompatActivity() {
                 bottomMargin = dp(12)
             }
             setImageResource(if (drawableId != 0) drawableId else R.drawable.sample_nback_static)
+
+            Log.d("Manual", "Static image loaded: drawableId=$drawableId")
         }
 
     /** GIF/애니 WebP 뷰 (API 28+ 자동 재생, 미만은 정지 이미지 대체) */
@@ -207,6 +218,7 @@ class ManualActivity : AppCompatActivity() {
 
             if (drawableId == 0) {
                 setImageResource(R.drawable.sample_nback_static)
+                Log.w("Manual", "Animated image not found, using sample_nback_static")
                 return@apply
             }
 
@@ -215,31 +227,45 @@ class ManualActivity : AppCompatActivity() {
                     val src = ImageDecoder.createSource(resources, drawableId)
                     val dr = ImageDecoder.decodeDrawable(src)
                     setImageDrawable(dr)
-                    if (dr is AnimatedImageDrawable) dr.start()
-                } catch (_: Throwable) {
+                    if (dr is AnimatedImageDrawable) {
+                        dr.start()
+                        Log.d("Manual", "Animated image started: drawableId=$drawableId")
+                    }
+                } catch (e: Throwable) {
                     setImageResource(R.drawable.sample_nback_static)
+                    Log.e("Manual", "Failed to load animated image: ${e.message}")
                 }
             } else {
                 // 필요하면 Glide/Coil로 대체 가능
                 setImageResource(R.drawable.sample_nback_static)
+                Log.d("Manual", "API < 28, using static image instead of animation")
             }
         }
 
     /** 파일명이 존재하면 drawable id, 없으면 0 반환 */
-    private fun resolveDrawableId(name: String): Int =
-        resources.getIdentifier(name, "drawable", packageName)
-
-    private fun setupClickListeners() {
-        backButton.setOnClickListener { finish() }
-        startButton.setOnClickListener { startBaselineSurvey() }
+    private fun resolveDrawableId(name: String): Int {
+        val id = resources.getIdentifier(name, "drawable", packageName)
+        Log.d("Manual", "Resolved drawable '$name' -> id=$id")
+        return id
     }
 
-    private fun startBaselineSurvey() {
-        val intent = Intent(this, SelfReportActivity::class.java).apply {
-            putExtra("blockNumber", 0)
-            putExtra("blockName", "Baseline")
+    private fun setupClickListeners() {
+        backButton.setOnClickListener {
+            Log.d("Manual", "Back button clicked")
+            finish()
+        }
+        startButton.setOnClickListener {
+            Log.d("Manual", "Start button clicked - moving to TutorialActivity")
+            startTutorialActivity()
+        }
+    }
+
+    private fun startTutorialActivity() {
+        Log.d("Manual", "Starting TutorialActivity")
+        Log.d("Manual", "Participant: $participantName")
+
+        val intent = Intent(this, TutorialActivity::class.java).apply {
             putExtra("participantName", participantName)
-            putExtra("surveyType", "baseline")
         }
         startActivity(intent)
         finish()

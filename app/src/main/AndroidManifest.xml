@@ -28,6 +28,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".TutorialActivity"
+            android:exported="false" />
+
         <!-- Manual Activity -->
         <activity
             android:name=".ManualActivity"

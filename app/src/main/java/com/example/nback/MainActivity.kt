@@ -10,6 +10,7 @@ import android.os.CountDownTimer
 import android.os.Environment
 import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -18,29 +19,11 @@ import java.io.File
 import java.io.FileWriter
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.random.Random
 import androidx.appcompat.app.AlertDialog
-import androidx.annotation.RequiresApi
-import android.content.ContentValues
-import android.provider.MediaStore
-import java.io.*
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
-
+import android.view.MotionEvent
 
 class MainActivity : AppCompatActivity() {
-    // MainActivity 클래스 안에 필드로 추가
-    private var sessionId: String = ""      // 첫 초기화 때만 만들어 끝까지 재사용
-    private var didInitDirs: Boolean = false
-    // MainActivity 클래스 안에 추가
-    private fun restoreParticipantDirectories(baseDirPath: String) {
-        participantBaseDir = File(baseDirPath)
-        participantImagesDir = File(participantBaseDir, "nback_images").apply { mkdirs() }
-        nbackResultsFile = File(participantBaseDir, "nback_results.csv")
-        surveyResultsFile = File(participantBaseDir, "survey.csv")
-        didInitDirs = true
-        Log.d("NBack", "Restored dirs: ${participantBaseDir.absolutePath}")
-    }
-
     // 실행 단계
     private enum class Phase { NONE, COUNTDOWN, STIMULUS, RESPONSE, INTER_TRIAL, REST, AUTO_START }
     private var currentPhase: Phase = Phase.NONE
@@ -78,7 +61,7 @@ class MainActivity : AppCompatActivity() {
     private var participantName = ""
     private var currentN = 0
     private var currentTrial = 0
-    private var totalTrials = 1
+    private var totalTrials = 30 // 실제 실험용 (테스트시 2로 변경)
     private var stimulusList = mutableListOf<Int>()
     private var experimentStartTime = 0L
     private var isExperimentRunning = false
@@ -100,12 +83,13 @@ class MainActivity : AppCompatActivity() {
         val currentTime: String,
         val computerTime: String,
         val userAnswer: String,
-        // ▼ 추가
-        val firstTouchTimeMs: Long,
-        val lastTouchTimeMs: Long,
-        val touchDurationMs: Long
+        val firstTouchTime: Long,
+        val lastTouchTime: Long,
+        val duration: Long
     )
-
+    // ▼ 각 트라이얼의 최초/최종 터치 시각 기록(ms)
+    private var trialFirstTouchTime: Long = 0L
+    private var trialLastTouchTime: Long = 0L
 
     companion object {
         // ▼ 추가: 다른 Activity들이 참조할 수 있도록 static 변수들 추가
@@ -115,74 +99,175 @@ class MainActivity : AppCompatActivity() {
         var currentParticipantName: String = ""
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        // ...
+
+        // 화면 꺼짐 방지 (자동 회전 허용)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         initializeViews()
         requestPermissions()
 
+        // Intent에서 participantName 받기
         participantName = intent.getStringExtra("participantName") ?: "Unknown_${System.currentTimeMillis()}"
 
-        // 🔸 SelfReport 에서 넘겨준 기존 폴더 경로가 있으면 재사용
-        val returnedBaseDir = intent.getStringExtra("participantBaseDir")
-        if (!returnedBaseDir.isNullOrEmpty()) {
-            restoreParticipantDirectories(returnedBaseDir)
-        } else {
-            initializeParticipantDirectories()  // 기존대로 1회 초기화
-        }
+        // 피험자 폴더 구조 초기화
+        initializeParticipantDirectories()
 
+        // 흐름 처리
         val resumeFromBlock = intent.getIntExtra("resumeFromBlock", -1)
-        if (resumeFromBlock >= 0) {
+        val startBaselineSurvey = intent.getBooleanExtra("startBaselineSurvey", false)
+
+        Log.d("NBack", "=== MainActivity Flow Control ===")
+        Log.d("NBack", "resumeFromBlock: $resumeFromBlock")
+        Log.d("NBack", "startBaselineSurvey: $startBaselineSurvey")
+        Log.d("NBack", "participantName: $participantName")
+
+        if (startBaselineSurvey) {
+            // 튜토리얼에서 돌아온 경우 → 폴더 초기화 후 사전 설문으로
+            Log.d("NBack", "Flow: Tutorial -> Baseline Survey")
             participantName = intent.getStringExtra("participantName") ?: participantName
-            // ❗여기서 다시 initializeParticipantDirectories() 호출하지 말 것!
+            initializeParticipantDirectories()  // ✅ 폴더 초기화 추가!
+            startBaselineSurvey()
+        } else if (resumeFromBlock >= 0) {
+            // 설문조사에서 돌아온 경우
+            Log.d("NBack", "Flow: Survey -> Experiment (resuming from block $resumeFromBlock)")
+            participantName = intent.getStringExtra("participantName") ?: participantName
+            initializeParticipantDirectories()
             resumeFromSelfReport(resumeFromBlock)
         } else {
+            // 처음 시작하는 경우 → ManualActivity로 이동
+            Log.d("NBack", "Flow: Start -> Manual")
             startManualActivity()
         }
     }
 
-
-    // REPLACE: initializeParticipantDirectories()
+    // ▼ 변경: 단순화된 폴더 구조로 변경
     private fun initializeParticipantDirectories() {
-        // 이미 한 번 했으면 재진입 금지
-        if (didInitDirs && ::nbackResultsFile.isInitialized && nbackResultsFile.parentFile?.exists() == true) {
-            Log.d("NBack", "Dirs already initialized. Using: ${participantBaseDir.absolutePath}")
-            return
+        try {
+            // Downloads 폴더를 기본 저장 위치로 사용
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+
+            // Downloads 폴더가 존재하지 않으면 생성
+            if (!downloadsDir.exists()) {
+                downloadsDir.mkdirs()
+            }
+
+            // NBack 실험 결과 메인 폴더 생성
+            val baseExperimentDir = File(downloadsDir, "NBack_Experiment_Results").apply {
+                if (!exists()) mkdirs()
+            }
+
+            // 피험자별 폴더 생성 (타임스탬프 포함으로 중복 방지)
+            val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
+            val participantDirName = "${participantName}"
+
+            participantBaseDir = File(baseExperimentDir, participantDirName).apply {
+                if (!exists()) mkdirs()
+            }
+
+            // ▼ 변경: 단순화된 구조
+            // nback_images 폴더만 하위 폴더로 생성
+            participantImagesDir = File(participantBaseDir, "nback_images").apply {
+                if (!exists()) mkdirs()
+            }
+
+            // CSV 파일들은 피험자 폴더 직접 아래에 생성
+            nbackResultsFile = File(participantBaseDir, "nback_result.csv")
+            surveyResultsFile = File(participantBaseDir, "nback_survey.csv")
+
+            // 폴더 생성 확인 및 로그
+            val foldersCreated = listOf(
+                "Base: ${participantBaseDir.exists()} - ${participantBaseDir.absolutePath}",
+                "Images: ${participantImagesDir.exists()} - ${participantImagesDir.absolutePath}",
+                "NBack CSV: ${nbackResultsFile.parentFile?.exists()} - ${nbackResultsFile.absolutePath}",
+                "Survey CSV: ${surveyResultsFile.parentFile?.exists()} - ${surveyResultsFile.absolutePath}"
+            )
+
+            Log.d("NBack", "Participant directories created:")
+            foldersCreated.forEach { Log.d("NBack", it) }
+
+            // 사용자에게 저장 위치 알림
+            Toast.makeText(
+                this,
+                "데이터 저장 위치:\nDownloads/NBack_Experiment_Results/\n${participantDirName}/",
+                Toast.LENGTH_LONG
+            ).show()
+
+        } catch (e: Exception) {
+            Log.e("NBack", "폴더 생성 실패: ${e.message}", e)
+
+            // Downloads 폴더 접근 실패 시 앱 전용 폴더로 fallback
+            Toast.makeText(this, "Downloads 폴더 접근 실패. 앱 전용 폴더를 사용합니다: ${e.message}", Toast.LENGTH_LONG).show()
+
+            try {
+                val fallbackRoot = getExternalFilesDir(null) ?: filesDir
+                val baseExperimentDir = File(fallbackRoot, "nback_experiment_results").apply { mkdirs() }
+                val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
+                val participantDirName = "${participantName}"
+
+                participantBaseDir = File(baseExperimentDir, participantDirName).apply { mkdirs() }
+                currentParticipantBaseDir = participantBaseDir.absolutePath
+                participantImagesDir = File(participantBaseDir, "nback_images").apply { mkdirs() }
+                nbackResultsFile = File(participantBaseDir, "nback_result.csv")
+                surveyResultsFile = File(participantBaseDir, "nback_survey.csv")
+
+                Log.d("NBack", "Fallback directories created at: ${participantBaseDir.absolutePath}")
+            } catch (fallbackException: Exception) {
+                Log.e("NBack", "Fallback 폴더 생성도 실패: ${fallbackException.message}", fallbackException)
+                Toast.makeText(this, "폴더 생성 완전 실패: ${fallbackException.message}", Toast.LENGTH_SHORT).show()
+            }
         }
-
-        val baseRoot = getExternalFilesDir(null) ?: filesDir
-        val baseExperimentDir = File(baseRoot, "nback_experiment_results").apply { mkdirs() }
-
-        // 세션 ID를 처음 한 번만 생성
-        if (sessionId.isEmpty()) {
-            sessionId = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
-        }
-        val participantDirName = "${participantName}_$sessionId"
-
-        participantBaseDir   = File(baseExperimentDir, participantDirName).apply { mkdirs() }
-        participantImagesDir = File(participantBaseDir, "nback_images").apply { mkdirs() }
-        nbackResultsFile     = File(participantBaseDir, "nback_results.csv")
-        surveyResultsFile    = File(participantBaseDir, "survey.csv")
-
-        didInitDirs = true
-
-        Log.d("NBack", "Init dirs (once): ${participantBaseDir.absolutePath}")
-        Toast.makeText(this, "저장 위치: ${participantBaseDir.absolutePath}", Toast.LENGTH_LONG).show()
     }
 
     // ▼ 변경: Downloads 폴더 접근을 위한 권한 요청 강화
-// REPLACE: requestPermissions()
     private fun requestPermissions() {
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
-            val perms = arrayOf(
-                Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            )
-            val need = perms.any { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
-            if (need) ActivityCompat.requestPermissions(this, perms, 100)
+        val permissions = mutableListOf<String>()
+
+        // API 레벨별 권한 처리
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
+                // Android 11+ (API 30+): MANAGE_EXTERNAL_STORAGE 권한 필요
+                if (!Environment.isExternalStorageManager()) {
+                    // 설정으로 이동하여 권한 허용 요청
+                    try {
+                        val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                            data = android.net.Uri.parse("package:$packageName")
+                        }
+                        startActivity(intent)
+                        Toast.makeText(this, "Downloads 폴더 접근을 위해 '모든 파일 액세스' 권한을 허용해주세요.", Toast.LENGTH_LONG).show()
+                    } catch (e: Exception) {
+                        Log.e("NBack", "권한 설정 화면 열기 실패: ${e.message}")
+                        Toast.makeText(this, "권한 설정을 수동으로 허용해주세요.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
+                // Android 10 (API 29): 제한된 접근이지만 일부 권한 요청
+                permissions.addAll(arrayOf(
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                ))
+            }
+
+            else -> {
+                // Android 9 이하: 기존 권한 방식
+                permissions.addAll(arrayOf(
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                ))
+            }
+        }
+
+        // 필요한 권한들 중 허용되지 않은 것들만 요청
+        val needPermissions = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (needPermissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, needPermissions.toTypedArray(), 100)
         }
     }
 
@@ -205,9 +290,8 @@ class MainActivity : AppCompatActivity() {
                 Log.d("NBack", "모든 권한 허용됨")
             }
 
-            if (!didInitDirs) {
-                initializeParticipantDirectories()
-            }
+            // 권한 처리 완료 후 폴더 재초기화
+            initializeParticipantDirectories()
         }
     }
 
@@ -258,7 +342,7 @@ class MainActivity : AppCompatActivity() {
         var left = 3
         timerText.text = "재개까지 $left 초"
         countdownTimer?.cancel()
-        countdownTimer = object : CountDownTimer(3000, 1000) {
+        countdownTimer = object : CountDownTimer(300, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 left = (millisUntilFinished / 1000).toInt() + 1
                 timerText.text = "재개까지 $left 초"
@@ -331,20 +415,40 @@ class MainActivity : AppCompatActivity() {
             finish() // MainActivity 종료
         } catch (e: Exception) {
             Log.e("NBack", "Failed to start Manual Activity: ${e.message}")
-            Toast.makeText(this, "매뉴얼 화면 로딩 실패. 설문조사로 이동합니다.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "매뉴얼 화면 로딩 실패. 튜토리얼로 이동합니다.", Toast.LENGTH_SHORT).show()
+            startTutorialActivity()
+        }
+    }
+
+    private fun startTutorialActivity() {
+        try {
+            val intent = Intent(this, TutorialActivity::class.java).apply {
+                putExtra("participantName", participantName)
+            }
+            startActivity(intent)
+            finish()
+        } catch (e: Exception) {
+            Log.e("NBack", "Failed to start Tutorial Activity: ${e.message}")
+            Toast.makeText(this, "튜토리얼 화면 로딩 실패. 설문조사로 이동합니다.", Toast.LENGTH_SHORT).show()
             startBaselineSurvey()
         }
     }
 
     private fun startBaselineSurvey() {
+        Log.d("NBack", "=== Starting Baseline Survey ===")
+        Log.d("NBack", "Participant: $participantName")
+        Log.d("NBack", "Survey file path: ${surveyResultsFile.absolutePath}")
+        Log.d("NBack", "Base dir: ${participantBaseDir.absolutePath}")
+
         try {
             val intent = Intent(this, SelfReportActivity::class.java).apply {
                 putExtra("blockNumber", 0)
                 putExtra("blockName", "Baseline")
                 putExtra("participantName", participantName)
                 putExtra("surveyType", "baseline")
+                // ▼ 추가: survey 저장 경로 전달
                 putExtra("surveyFilePath", surveyResultsFile.absolutePath)
-                putExtra("participantBaseDir", participantBaseDir.absolutePath) // ✅ 추가
+                putExtra("participantBaseDir", participantBaseDir.absolutePath)
             }
             startActivity(intent)
             finish()
@@ -352,22 +456,6 @@ class MainActivity : AppCompatActivity() {
             Log.e("NBack", "Failed to start baseline survey: ${e.message}")
             Toast.makeText(this, "설문조사 실패. 실험을 바로 시작합니다.", Toast.LENGTH_SHORT).show()
             startExperimentDirectly()
-        }
-    }
-
-    // MainActivity.kt 내부에 추가
-    private fun ensureSurveyCsvHeader() {
-        try {
-            if (!::surveyResultsFile.isInitialized) return
-            if (!surveyResultsFile.exists()) {
-                surveyResultsFile.parentFile?.mkdirs()
-                surveyResultsFile.writeText(
-                    "participant,block,question_id,answer,current_time\n"
-                )
-                Log.d("NBack", "Survey CSV created with header: ${surveyResultsFile.absolutePath}")
-            }
-        } catch (e: Exception) {
-            Log.e("NBack", "Failed to ensure survey header: ${e.message}", e)
         }
     }
 
@@ -416,13 +504,38 @@ class MainActivity : AppCompatActivity() {
         restartAppButton.setOnClickListener { restartApplication() }
 
         // 캔버스 터치 시 힌트 텍스트 숨기기
-        drawingView.setOnTouchListener { _, _ ->
+        drawingView.setOnTouchListener { _, event ->
+            // 힌트 텍스트 숨김
             canvasHintText.visibility = View.GONE
+
+            try {
+                if (currentPhase == Phase.RESPONSE && event != null) {
+                    when (event.action) {
+                        android.view.MotionEvent.ACTION_DOWN -> {
+                            if (trialFirstTouchTime == 0L) {
+                                trialFirstTouchTime = System.currentTimeMillis()
+                            }
+                            trialLastTouchTime = System.currentTimeMillis()
+                        }
+                        android.view.MotionEvent.ACTION_MOVE -> {
+                            // 펜이 화면에 닿아있는 동안에도 최신 시각으로 갱신
+                            if (trialFirstTouchTime != 0L) {
+                                trialLastTouchTime = System.currentTimeMillis()
+                            }
+                        }
+                        android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                            if (trialFirstTouchTime != 0L) {
+                                trialLastTouchTime = System.currentTimeMillis()
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+
             false
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     private fun resumeFromSelfReport(blockNumber: Int) {
         when (blockNumber) {
             0 -> {
@@ -756,8 +869,11 @@ class MainActivity : AppCompatActivity() {
 
     // ▼ 변경: 타이머 보관 + 종료 후 다음 시행 타이머도 보관
     private fun startResponsePeriod() {
+        // 트라이얼 터치 타이밍 초기화
+        trialFirstTouchTime = 0L
+        trialLastTouchTime = 0L
+
         currentPhase = Phase.RESPONSE
-        drawingView.resetTouchCapture()
         val responseTime = 3000L
 
         responseTimer?.cancel()
@@ -785,207 +901,268 @@ class MainActivity : AppCompatActivity() {
             }
         }.start()
     }
+
     private fun saveTrialData() {
         val recognizedText = drawingView.getRecognizedText()
         val correctAnswer = getCorrectAnswer()
 
         val timestamp = System.currentTimeMillis()
+        if (trialFirstTouchTime > 0L && trialLastTouchTime == 0L) {
+            trialLastTouchTime = timestamp
+        }
         val imageFileName = "${currentBlockName}_trial${String.format("%02d", currentTrial + 1)}_" +
                 "stimulus${currentStimulus}_${timestamp}"
 
+        // ▼ 강화된 이미지 저장 로직
+        var imageSaveSuccess = false
         if (drawingView.hasUserDrawing()) {
-            val imageSaved = drawingView.saveCanvasAsPNG(imageFileName, participantImagesDir.absolutePath)
-            if (imageSaved) {
-                Log.d("NBack", "Image saved: ${participantImagesDir.absolutePath}/$imageFileName.png")
-            } else {
-                Log.e("NBack", "Failed to save image: $imageFileName.png")
-            }
-        }
+            Log.d("NBack", "=== Starting image save ===")
+            Log.d("NBack", "Image target dir: ${participantImagesDir.absolutePath}")
+            Log.d("NBack", "Image dir exists: ${participantImagesDir.exists()}")
+            Log.d("NBack", "Image dir writable: ${participantImagesDir.canWrite()}")
 
-        // ▼ 추가: 컴퓨터 시간(epoch ms) 기준의 터치 타임
-        val firstMs = drawingView.getFirstTouchTimeMillis() ?: -1L
-        val lastMs  = drawingView.getLastTouchTimeMillis()  ?: -1L
-        val durationMs = if (firstMs > 0 && lastMs >= firstMs) lastMs - firstMs else 0L
+            // 이미지 디렉토리 확실히 생성
+            if (!participantImagesDir.exists()) {
+                val mkdirResult = participantImagesDir.mkdirs()
+                Log.d("NBack", "Created image directory: $mkdirResult")
+            }
+
+            try {
+                imageSaveSuccess = drawingView.saveCanvasAsPNG(imageFileName, participantImagesDir.absolutePath)
+
+                if (imageSaveSuccess) {
+                    val savedImageFile = File(participantImagesDir, "$imageFileName.png")
+                    val imageSize = if (savedImageFile.exists()) savedImageFile.length() else 0
+                    Log.d("NBack", "✅ Image saved successfully: ${savedImageFile.absolutePath}")
+                    Log.d("NBack", "Image file size: $imageSize bytes")
+                } else {
+                    Log.e("NBack", "❌ Failed to save image: $imageFileName.png")
+
+                    // 이미지 저장 실패 시 비상 저장 시도
+                    try {
+                        val emergencyImageDir = File(filesDir, "emergency_images").apply { mkdirs() }
+                        val emergencySuccess = drawingView.saveCanvasAsPNG("emergency_$imageFileName", emergencyImageDir.absolutePath)
+                        Log.d("NBack", "Emergency image save: $emergencySuccess")
+                    } catch (e: Exception) {
+                        Log.e("NBack", "Emergency image save failed", e)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("NBack", "Exception during image save", e)
+            }
+        } else {
+            Log.d("NBack", "No drawing to save for trial ${currentTrial + 1}")
+        }
 
         val trialData = TrialData(
             block = currentBlockName,
             trial = currentTrial + 1,
             n = currentN,
             stimulus = currentStimulus,
-            correctAnswer = correctAnswer,
-            currentTime = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date()),
-            timestamp = timestamp,
-            computerTime = System.currentTimeMillis().toString(),
+            correctAnswer = getCorrectAnswer(),
+            currentTime = "${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())}",
+            timestamp = timestamp - experimentStartTime,
+            computerTime = "${System.currentTimeMillis()}",
             userAnswer = recognizedText,
-            // ▼ 추가 필드
-            firstTouchTimeMs = firstMs,
-            lastTouchTimeMs = lastMs,
-            touchDurationMs = durationMs
+            firstTouchTime = trialFirstTouchTime,
+            lastTouchTime = trialLastTouchTime,
+            duration = if (trialFirstTouchTime > 0L && trialLastTouchTime > 0L) trialLastTouchTime - trialFirstTouchTime else 0L
         )
 
         experimentData.add(trialData)
         saveTrialDataToCSV(trialData)
 
-        Log.d("NBack", "Trial ${currentTrial + 1}: stimulus=$currentStimulus, correct=$correctAnswer, user=$recognizedText, first=$firstMs, last=$lastMs, dur=$durationMs")
+        Log.d("NBack", "=== Trial ${currentTrial + 1} Summary ===")
+        Log.d("NBack", "Stimulus: $currentStimulus, Correct: $correctAnswer, User: $recognizedText")
+        Log.d("NBack", "Image saved: $imageSaveSuccess")
+        Log.d("NBack", "Total trials in memory: ${experimentData.size}")
+        Log.d("NBack", "CSV file size: ${if (nbackResultsFile.exists()) nbackResultsFile.length() else 0} bytes")
     }
 
-    // REPLACE: saveTrialDataToCSV(...)
+    // ▼ 변경: CSV append 문제 해결
     private fun saveTrialDataToCSV(trialData: TrialData) {
+        Log.d("NBack", "=== Starting trial data save ===")
+        Log.d("NBack", "Target file: ${nbackResultsFile.absolutePath}")
+        Log.d("NBack", "Parent dir exists: ${nbackResultsFile.parentFile?.exists()}")
+        Log.d("NBack", "File exists: ${nbackResultsFile.exists()}")
+
         try {
-            nbackResultsFile.parentFile?.mkdirs()
+            // 디렉토리 존재 확인 및 생성
+            val parentDir = nbackResultsFile.parentFile
+            if (parentDir != null && !parentDir.exists()) {
+                val mkdirResult = parentDir.mkdirs()
+                Log.d("NBack", "Created directories: $mkdirResult")
+            }
 
             val needsHeader = !nbackResultsFile.exists() || nbackResultsFile.length() == 0L
+            Log.d("NBack", "Needs header: $needsHeader")
+
+            // ▼ 변경: FileWriter를 사용하여 append 모드로 작성
             FileWriter(nbackResultsFile, true).use { writer ->
                 if (needsHeader) {
-                    writer.write(
-                        "participant,block,trial,n,stimulus,correct_answer,computer_time,timestamp,current_time,user_answer," +
-                                "first_touch_time_ms,last_touch_time_ms,touch_duration_ms\n"
-                    )
+                    writer.write("participant,block,trial,n,stimulus,correct_answer,computer_time,timestamp,current_time,first_touch_time,last_touch_time,duration\n")
+                                Log.d("NBack", "Header written")
                 }
 
-                writer.write(
-                    "${participantName},${trialData.block},${trialData.trial},${trialData.n},${trialData.stimulus}," +
-                            "${trialData.correctAnswer},${trialData.computerTime},${trialData.timestamp},${trialData.currentTime},${trialData.userAnswer}," +
-                            "${trialData.firstTouchTimeMs},${trialData.lastTouchTimeMs},${trialData.touchDurationMs}\n"
-                )
+                val csvLine = "${participantName},${trialData.block},${trialData.trial},${trialData.n},${trialData.stimulus}," +
+                        "${trialData.correctAnswer},${trialData.computerTime},${trialData.timestamp},${trialData.currentTime}," +
+                        "${trialData.firstTouchTime},${trialData.lastTouchTime},${trialData.duration}\n"
+
+                writer.write(csvLine)
+                writer.flush()
+
+                Log.d("NBack", "CSV line written: $csvLine")
             }
-            Log.d("NBack", "[WRITE OK] ${nbackResultsFile.absolutePath} size=${nbackResultsFile.length()}")
+
+            val fileSize = nbackResultsFile.length()
+            Log.d("NBack", "Trial data saved successfully. File size: $fileSize bytes")
+
         } catch (e: Exception) {
-            Log.e("NBack", "[WRITE FAIL] nback_results.csv : ${e.message}", e)
-            Toast.makeText(this, "결과 저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+            Log.e("NBack", "Failed to save trial data to CSV", e)
+
+            // Fallback: 내부 저장소에 저장
+            try {
+                val fallbackFile = File(filesDir, "nback_emergency.csv")
+                FileWriter(fallbackFile, true).use { writer ->
+                    if (!fallbackFile.exists() || fallbackFile.length() == 0L) {
+                        writer.write("participant,block,trial,n,stimulus,correct_answer,computer_time,timestamp,current_time,first_touch_time,last_touch_time,duration\n")
+                    }
+
+                    val csvLine = "${participantName},${trialData.block},${trialData.trial},${trialData.n},${trialData.stimulus}," +
+                            "${trialData.correctAnswer},${trialData.computerTime},${trialData.timestamp},${trialData.currentTime}," +
+                            "${trialData.firstTouchTime},${trialData.lastTouchTime},${trialData.duration}\n"
+                    writer.write(csvLine)
+                    writer.flush()
+                }
+                Log.d("NBack", "Emergency save successful: ${fallbackFile.absolutePath}")
+                Toast.makeText(this, "데이터 비상 저장 완료", Toast.LENGTH_SHORT).show()
+
+            } catch (fe: Exception) {
+                Log.e("NBack", "Emergency save also failed", fe)
+                Toast.makeText(this, "데이터 저장 완전 실패: ${fe.message}", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
-
     // ▼ 변경: 강화된 최종 저장 및 파일 검증
-    @RequiresApi(Build.VERSION_CODES.O)
-// REPLACE: saveDataToFile()
     private fun saveDataToFile() {
         try {
-            // 핵심: nback_results.csv 존재/크기
+            Log.d("NBack", "=== FINAL DATA VERIFICATION ===")
+
+            // 실시간으로 저장되고 있으므로 최종 검증만 수행
+            val imageCount = if (participantImagesDir.exists()) participantImagesDir.listFiles()?.size ?: 0 else 0
             val nbackExists = nbackResultsFile.exists()
-            val nbackSize   = if (nbackExists) nbackResultsFile.length() else 0L
-
-            // 참고 정보(경고로 취급하지 않음)
-            val imageCount  = if (::participantImagesDir.isInitialized && participantImagesDir.exists())
-                participantImagesDir.listFiles()?.size ?: 0 else 0
+            val nbackSize = if (nbackExists) nbackResultsFile.length() else 0
             val surveyExists = surveyResultsFile.exists()
-            val surveySize   = if (surveyExists) surveyResultsFile.length() else 0L
+            val surveySize = if (surveyExists) surveyResultsFile.length() else 0
 
-            // 요약 로그
-            Log.d("NBack", "=== FINAL SUMMARY ===")
-            Log.d("NBack", "Base: ${participantBaseDir.absolutePath}")
-            Log.d("NBack", "NBack CSV: $nbackExists, size=$nbackSize")
-            Log.d("NBack", "Survey CSV: $surveyExists, size=$surveySize")
-            Log.d("NBack", "Images: $imageCount")
+            Log.d("NBack", "=== FILE VERIFICATION RESULTS ===")
+            Log.d("NBack", "Base directory: ${participantBaseDir.absolutePath}")
+            Log.d("NBack", "Base directory exists: ${participantBaseDir.exists()}")
+            Log.d("NBack", "Images directory: ${participantImagesDir.absolutePath}")
+            Log.d("NBack", "Images directory exists: ${participantImagesDir.exists()}")
+            Log.d("NBack", "N-Back CSV: ${nbackResultsFile.absolutePath}")
+            Log.d("NBack", "N-Back CSV exists: $nbackExists, size: $nbackSize bytes")
+            Log.d("NBack", "Survey CSV: ${surveyResultsFile.absolutePath}")
+            Log.d("NBack", "Survey CSV exists: $surveyExists, size: $surveySize bytes")
+            Log.d("NBack", "Image files count: $imageCount")
+            Log.d("NBack", "Total trials in memory: ${experimentData.size}")
 
-            // 사용자 메시지
-            val downloadsPath = "Downloads/NBack_Experiment_Results/${participantBaseDir.name}/"
-            val message = if (nbackExists && nbackSize > 0L) {
+            // 파일 내용 샘플 확인 (N-Back CSV)
+            if (nbackExists && nbackSize > 0) {
+                try {
+                    val firstLines = nbackResultsFile.readLines().take(3)
+                    Log.d("NBack", "N-Back CSV first lines:")
+                    firstLines.forEachIndexed { index, line ->
+                        Log.d("NBack", "Line $index: $line")
+                    }
+                } catch (e: Exception) {
+                    Log.e("NBack", "Failed to read N-Back CSV sample", e)
+                }
+            }
+
+            // 이미지 파일 목록 확인
+            if (participantImagesDir.exists()) {
+                val imageFiles = participantImagesDir.listFiles()
+                Log.d("NBack", "Image files:")
+                imageFiles?.forEach { file ->
+                    Log.d("NBack", "- ${file.name} (${file.length()} bytes)")
+                }
+            }
+
+            // 문제점 진단
+            val issues = mutableListOf<String>()
+
+            if (!nbackExists) {
+                issues.add("N-Back 결과 파일 없음")
+            } else if (nbackSize == 0L) {
+                issues.add("N-Back 결과 파일 비어있음")
+            }
+
+            if (!surveyExists) {
+                issues.add("설문 결과 파일 없음")
+            } else if (surveySize == 0L) {
+                issues.add("설문 결과 파일 비어있음")
+            }
+
+            if (imageCount == 0) {
+                issues.add("이미지 파일 없음")
+            }
+
+            val downloadsPath = "Downloads/NBack_Experiment_Results/${participantName}/"
+            val message = if (issues.isEmpty()) {
                 "✅ 전체 실험 완료!\n" +
                         "참가자: $participantName\n" +
                         "저장 위치: $downloadsPath\n" +
-                        "- N-Back 결과: 저장됨 (${nbackSize} bytes)\n" +
-                        "- 설문 결과: ${if (surveyExists) "있음" else "없음"} (${surveySize} bytes)\n" +
+                        "- N-Back 결과: ${if (nbackExists) "저장됨" else "없음"} (${nbackSize} bytes)\n" +
+                        "  → nback_results/nback_result.csv\n" +
+                        "- 설문 결과: ${if (surveyExists) "저장됨" else "없음"} (${surveySize} bytes)\n" +
+                        "  → survey_results/nback_survey.csv\n" +
                         "- 그림 데이터: ${imageCount}개\n" +
+                        "  → nback_images/ 폴더\n" +
                         "총 시행 수: ${experimentData.size}\n" +
-                        "총 ${totalBlocks}개 블록 완료!"
+                        "총 ${totalBlocks}개 블록 완료!\n\n" +
+                        "파일 탐색기에서 Downloads 폴더를 확인하세요.\n" +
+                        "새로운 참가자를 위해 앱을 재시작하세요."
             } else {
-                "⚠️ 핵심 결과 파일(nback_results.csv)이 비어있거나 없습니다.\n" +
+                "⚠️ 실험 완료 (일부 문제 발견)\n" +
                         "참가자: $participantName\n" +
                         "저장 위치: $downloadsPath\n" +
-                        "- N-Back 결과: ${if (nbackExists) "있음" else "없음"} (${nbackSize} bytes)\n" +
-                        "- 설문 결과: ${if (surveyExists) "있음" else "없음"} (${surveySize} bytes)\n" +
+                        "문제점: ${issues.joinToString(", ")}\n" +
+                        "- N-Back 결과: ${if (nbackExists) "저장됨" else "❌없음"} (${nbackSize} bytes)\n" +
+                        "- 설문 결과: ${if (surveyExists) "저장됨" else "❌없음"} (${surveySize} bytes)\n" +
                         "- 그림 데이터: ${imageCount}개\n" +
-                        "필요시 다시 실행해 주세요."
+                        "메모리 내 시행 수: ${experimentData.size}\n\n" +
+                        "⚠️ 일부 데이터가 저장되지 않았을 수 있습니다.\n" +
+                        "앱 내부 저장소도 확인해보세요."
             }
+
             Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 
-            // UI 마무리
+            // 앱 재시작 버튼 표시
             restartAppButton.visibility = View.VISIBLE
             restartAppButton.text = "새 참가자를 위한 앱 재시작"
             emergencyButton.visibility = View.GONE
 
-            // 종료 시 ZIP 자동 내보내기
-            exportParticipantDataToDownloads()
+            Log.d("NBack", "=== EXPERIMENT COMPLETION SUMMARY ===")
+            Log.d("NBack", "Issues found: ${issues.size}")
+            issues.forEach { issue -> Log.w("NBack", "Issue: $issue") }
+            Log.d("NBack", "App restart button enabled")
 
         } catch (e: Exception) {
-            Log.e("NBack", "Finalization failed", e)
-            Toast.makeText(this, "데이터 정리 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-            exportParticipantDataToDownloads()
+            Log.e("NBack", "Final data verification failed", e)
+            Toast.makeText(this, "데이터 검증 실패: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
-
-    // ZIP 만들기
-    @RequiresApi(Build.VERSION_CODES.O)
-    private fun zipDir(srcDir: File, zipFile: File) {
-        ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFile))).use { zos ->
-            val base = srcDir.toPath()
-            srcDir.walkTopDown().filter { it.isFile }.forEach { f ->
-                val entryName = base.relativize(f.toPath()).toString()
-                zos.putNextEntry(ZipEntry(entryName))
-                FileInputStream(f).use { it.copyTo(zos) }
-                zos.closeEntry()
-            }
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.O)
-    private fun exportParticipantDataToDownloads() {
-        val baseDir = if (::participantBaseDir.isInitialized) participantBaseDir else return
-        Thread {
-            val outName = "nback_${participantName}_${System.currentTimeMillis()}.zip"
-            val tmpZip = File(cacheDir, outName).apply { if (exists()) delete() }
-            try {
-                // 1) 앱 전용 폴더 전체 ZIP
-                zipDir(baseDir, tmpZip)
-
-                // 2) MediaStore로 Downloads/NBack에 저장 (API 29+)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val values = ContentValues().apply {
-                        put(MediaStore.Downloads.DISPLAY_NAME, outName)
-                        put(MediaStore.Downloads.MIME_TYPE, "application/zip")
-                        put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/NBack")
-                    }
-                    val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                    if (uri != null) {
-                        contentResolver.openOutputStream(uri)?.use { os ->
-                            FileInputStream(tmpZip).use { it.copyTo(os) }
-                        }
-                        runOnUiThread { Toast.makeText(this, "Downloads/NBack/$outName 으로 내보냈습니다.", Toast.LENGTH_LONG).show() }
-                    } else {
-                        runOnUiThread { Toast.makeText(this, "내보내기 실패(MediaStore).", Toast.LENGTH_SHORT).show() }
-                    }
-                } else {
-                    // API 28 이하
-                    val dl = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    val outDir = File(dl, "NBack").apply { mkdirs() }
-                    tmpZip.copyTo(File(outDir, outName), overwrite = true)
-                    runOnUiThread { Toast.makeText(this, "Downloads/NBack/$outName 으로 내보냈습니다.", Toast.LENGTH_LONG).show() }
-                }
-            } catch (e: Exception) {
-                runOnUiThread { Toast.makeText(this, "내보내기 오류: ${e.message}", Toast.LENGTH_LONG).show() }
-            } finally {
-                tmpZip.delete()
-            }
-        }.start()
-    }
-
-
 
     private fun getCorrectAnswer(): String {
-        return when (currentN) {
-            0 -> if (currentStimulus == 5) "5" else "none"
-            else -> {
-                if (currentTrial >= currentN &&
-                    currentStimulus == stimulusList[currentTrial - currentN]
-                ) {
-                    stimulusList[currentTrial - currentN].toString()
-                } else {
-                    "none"
-                }
-            }
+        return if (currentTrial >= currentN) {
+            // n-back 정답: n번째 이전 자극(0-back이면 현재 자극)
+            stimulusList[currentTrial - currentN].toString()
+        } else {
+            ""
         }
+
     }
 
     private fun finishCurrentBlock() {
@@ -1001,11 +1178,13 @@ class MainActivity : AppCompatActivity() {
                     putExtra("blockName", currentBlockName)
                     putExtra("participantName", participantName)
                     putExtra("surveyType", surveyType)
+                    // ▼ 추가: survey 저장 경로 전달
                     putExtra("surveyFilePath", surveyResultsFile.absolutePath)
-                    putExtra("participantBaseDir", participantBaseDir.absolutePath) // ✅ 추가
+                    putExtra("participantBaseDir", participantBaseDir.absolutePath)
                 }
                 startActivity(intent)
                 finish()
+                return
             } catch (e: Exception) {
                 Log.e("NBack", "Failed to start SelfReportActivity: ${e.message}")
                 Toast.makeText(this, "설문조사 화면 로딩 실패. 다음 블록으로 진행합니다.", Toast.LENGTH_SHORT).show()
@@ -1062,7 +1241,7 @@ class MainActivity : AppCompatActivity() {
                     var countdown = 3
                     override fun onTick(millisUntilFinished: Long) {
                         countdown = (millisUntilFinished / 1000).toInt() + 1
-                        timerText.text = "다음 task의 첫 번째 숫자 제시까지 $countdown 초"
+                        timerText.text = "자동 시작까지 $countdown 초"
                     }
                     override fun onFinish() {
                         isExperimentRunning = true

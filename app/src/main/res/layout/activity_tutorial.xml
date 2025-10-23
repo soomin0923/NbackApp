@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F8F9FA">
+
+    <!-- 건너뛰기 버튼 (우상단) -->
+    <Button
+        android:id="@+id/skipButton"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:text="건너뛰기"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/emergency_button"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentRight="true"
+        android:layout_margin="12dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:elevation="8dp" />
+
+    <!-- 상단 정보 영역 -->
+    <LinearLayout
+        android:id="@+id/topInfoContainer"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_below="@id/skipButton"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="-33dp"
+        android:layout_marginRight="16dp"
+        android:background="@drawable/info_card_background"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- 제목 텍스트 -->
+        <TextView
+            android:id="@+id/titleText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:gravity="center"
+            android:text="N-Back 연습"
+            android:textColor="#3498DB"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <!-- 지시사항 텍스트 -->
+        <TextView
+            android:id="@+id/instructionText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:gravity="center"
+            android:text="현재 난이도: 0-back\n현재 화면에 표시되는 숫자를 써주세요"
+            android:textColor="#2C3E50"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <!-- 진행상황 텍스트 -->
+        <TextView
+            android:id="@+id/progressText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:gravity="center"
+            android:text="연습 1/4 - 시행: 0/4"
+            android:textColor="#7F8C8D"
+            android:textSize="16sp" />
+
+        <!-- 타이머 텍스트 -->
+        <TextView
+            android:id="@+id/timerText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="실험을 시작하세요"
+            android:textColor="#E74C3C"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+    <!-- 자극 제시 영역 -->
+    <RelativeLayout
+        android:id="@+id/stimulusContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/topInfoContainer"
+        android:layout_marginTop="20dp"
+        android:layout_centerHorizontal="true">
+
+        <TextView
+            android:id="@+id/stimulusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="5"
+            android:textSize="56sp"
+            android:textStyle="bold"
+            android:textColor="#000000"
+            android:layout_centerHorizontal="true"
+            android:visibility="invisible"/>
+    </RelativeLayout>
+
+    <!-- 컨트롤 버튼 영역 -->
+    <LinearLayout
+        android:id="@+id/controlButtonsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/stimulusContainer"
+        android:gravity="center"
+        android:layout_marginTop="15dp">
+
+        <Button
+            android:id="@+id/clearButton"
+            android:layout_width="wrap_content"
+            android:layout_height="54dp"
+            android:layout_marginEnd="10dp"
+            android:background="@drawable/clear_button"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="지우기"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/nextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="54dp"
+            android:background="@drawable/start_button"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="다음"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- 그리기 영역 -->
+    <FrameLayout
+        android:id="@+id/drawingContainer"
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:layout_below="@id/controlButtonsContainer"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/content_background">
+
+        <com.example.nback.DrawingView
+            android:id="@+id/drawingView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#FFFFFF" />
+
+        <TextView
+            android:id="@+id/canvasHintText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="여기에 숫자를 써주세요"
+            android:textSize="16sp"
+            android:textColor="#AAAAAA"
+            android:clickable="false"
+            android:focusable="false"
+            android:enabled="false"/>
+    </FrameLayout>
+
+</RelativeLayout>
