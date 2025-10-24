@@ -20,18 +20,20 @@ class TutorialActivity : AppCompatActivity() {
     private lateinit var clearButton: Button
     private lateinit var nextButton: Button
     private lateinit var skipButton: Button
+    // ▼ 추가: 0-back에서 사용자가 눌러서 시작하도록 하는 시작 버튼
+    private lateinit var startButton: Button
 
     private var participantName = ""
     private var currentLevel = 0 // 0, 1, 2, 3 back
     private var currentTrial = 0
-    private var isWaitingForResponse = false
+    private var isWaitingForResponse = true
 
     // 튜토리얼 시퀀스 정의
     private val tutorialSequences = mapOf(
-        0 to listOf(5, 3, 7, 2),
-        1 to listOf(3, 7, 7, 2),
-        2 to listOf(4, 6, 4, 8),
-        3 to listOf(2, 5, 8, 2)
+        0 to listOf(0, 1, 2, 3, 4),
+        1 to listOf(0, 1, 2, 3, 4),
+        2 to listOf(0, 1, 2, 3, 4),
+        3 to listOf(0, 1, 2, 3, 4)
     )
 
     private var currentSequence = listOf<Int>()
@@ -46,7 +48,9 @@ class TutorialActivity : AppCompatActivity() {
 
         initializeViews()
         setupClickListeners()
-        startTutorialLevel(0)
+
+        // ▼ 변경: 0-back은 자동 시작하지 않고, 사용자가 '시작' 버튼을 눌러서 시작
+        startTutorialLevel(0) // 안내/문구/화면 구성까지만 하고, 카운트다운은 startButton으로 시작
     }
 
     private fun initializeViews() {
@@ -60,10 +64,17 @@ class TutorialActivity : AppCompatActivity() {
         clearButton = findViewById(R.id.clearButton)
         nextButton = findViewById(R.id.nextButton)
         skipButton = findViewById(R.id.skipButton)
+        // ▼ 추가: 시작 버튼
+        startButton = findViewById(R.id.startButton)
 
         stimulusText.visibility = View.INVISIBLE
-        nextButton.isEnabled = false
-        nextButton.visibility = View.GONE  // ✅ 처음에는 숨김
+        nextButton.isEnabled = true
+        nextButton.visibility = View.INVISIBLE  // ✅ 처음에는 숨김
+
+        // 시작 버튼은 기본적으로 표시 (0-back용), 이후 레벨에서는 숨김/미사용
+        startButton.visibility = View.VISIBLE
+        startButton.isEnabled = true
+        startButton.text = "시작"
 
         Log.d("Tutorial", "TutorialActivity initialized successfully")
     }
@@ -78,7 +89,7 @@ class TutorialActivity : AppCompatActivity() {
         nextButton.setOnClickListener {
             if (currentLevel < 3) {
                 // 다음 레벨로 이동
-                nextButton.isEnabled = false
+                nextButton.isEnabled = true
                 nextButton.visibility = View.GONE
                 startTutorialLevel(currentLevel + 1)
             }
@@ -113,15 +124,30 @@ class TutorialActivity : AppCompatActivity() {
         instructionText.text = instruction
         progressText.text = "연습 ${currentLevel + 1}/4 - 시행: 1/${currentSequence.size}"
 
-        // 다음 버튼 숨기기 (시행 중에는 사용 안 함)
-        nextButton.isEnabled = false
+        // 다음 버튼은 시행 중엔 숨김
+        nextButton.isEnabled = true
         nextButton.visibility = View.GONE
         nextButton.text = "다음"
 
         Log.d("Tutorial", "Starting tutorial level: $currentLevel")
 
-        // 3초 후 첫 시행 시작
-        showCountdown()
+        // ▼ 핵심 변경: 0-back에서는 여기서 바로 showCountdown() 하지 않음
+        if (currentLevel == 0) {
+            // 시작 버튼으로 카운트다운 시작
+            startButton.visibility = View.VISIBLE
+            startButton.isEnabled = true
+            startButton.text = "0-Back 시작"
+            startButton.setOnClickListener {
+                startButton.visibility = View.GONE
+                showCountdown()
+            }
+            // 안내 문구만 보여주고 대기
+            timerText.text = "시작 버튼을 눌러 연습을 시작하세요"
+        } else {
+            // 1-back 이상은 기존처럼 즉시 진행(원하면 동일하게 버튼으로 변경 가능)
+            startButton.visibility = View.GONE
+            showCountdown()
+        }
     }
 
     private fun showCountdown() {
@@ -217,7 +243,7 @@ class TutorialActivity : AppCompatActivity() {
     // ▼ 변경: 다음 버튼은 레벨 변경 시에만 사용
     private fun checkAnswerAndProceed() {
         // 레벨 변경 시에만 호출됨
-        nextButton.isEnabled = false
+        nextButton.isEnabled = true
         nextButton.visibility = View.GONE
         startTutorialLevel(currentLevel + 1)
     }

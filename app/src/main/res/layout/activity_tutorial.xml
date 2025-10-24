@@ -21,6 +21,7 @@
         android:paddingEnd="16dp"
         android:elevation="8dp" />
 
+
     <!-- 상단 정보 영역 -->
     <LinearLayout
         android:id="@+id/topInfoContainer"
@@ -139,6 +140,14 @@
             android:textColor="#FFFFFF"
             android:textSize="14sp"
             android:visibility="gone" />
+
+        <Button
+            android:id="@+id/startButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="시작"
+            android:visibility="visible" />
     </LinearLayout>
 
     <!-- 그리기 영역 -->
