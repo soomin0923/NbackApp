@@ -147,7 +147,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:text="시작"
-            android:visibility="visible" />
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- 그리기 영역 -->

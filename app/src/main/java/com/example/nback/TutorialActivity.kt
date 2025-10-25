@@ -30,7 +30,7 @@ class TutorialActivity : AppCompatActivity() {
 
     // 튜토리얼 시퀀스 정의
     private val tutorialSequences = mapOf(
-        0 to listOf(0, 1, 2, 3, 4),
+        0 to listOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
         1 to listOf(0, 1, 2, 3, 4),
         2 to listOf(0, 1, 2, 3, 4),
         3 to listOf(0, 1, 2, 3, 4)
@@ -66,6 +66,7 @@ class TutorialActivity : AppCompatActivity() {
         skipButton = findViewById(R.id.skipButton)
         // ▼ 추가: 시작 버튼
         startButton = findViewById(R.id.startButton)
+        startButton.visibility = View.GONE
 
         stimulusText.visibility = View.INVISIBLE
         nextButton.isEnabled = true
@@ -133,28 +134,29 @@ class TutorialActivity : AppCompatActivity() {
 
         // ▼ 핵심 변경: 0-back에서는 여기서 바로 showCountdown() 하지 않음
         if (currentLevel == 0) {
-            // 시작 버튼으로 카운트다운 시작
+            // 버튼 보이기 + 클릭하면 카운트다운 시작
             startButton.visibility = View.VISIBLE
             startButton.isEnabled = true
             startButton.text = "0-Back 시작"
+            timerText.text = "시작 버튼을 눌러 연습을 시작하세요"
+
+            // 중복 리스너 방지: 기존 리스너 제거 후 등록
             startButton.setOnClickListener {
                 startButton.visibility = View.GONE
                 showCountdown()
             }
-            // 안내 문구만 보여주고 대기
-            timerText.text = "시작 버튼을 눌러 연습을 시작하세요"
         } else {
-            // 1-back 이상은 기존처럼 즉시 진행(원하면 동일하게 버튼으로 변경 가능)
+            // 1/2/3-back은 자동 시작
             startButton.visibility = View.GONE
             showCountdown()
         }
     }
 
     private fun showCountdown() {
-        var countdown = 3
+        var countdown = 30
         timerText.text = "시작까지 $countdown 초"
 
-        object : CountDownTimer(3000, 1000) {
+        object : CountDownTimer(30000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 countdown = (millisUntilFinished / 1000).toInt() + 1
                 timerText.text = "시작까지 $countdown 초"
@@ -232,7 +234,7 @@ class TutorialActivity : AppCompatActivity() {
 
         // 1초 후 자동으로 다음 시행
         timerText.text = "다음 시행까지 1초"
-        object : CountDownTimer(1000, 1000) {
+        object : CountDownTimer(0, 1000) {
             override fun onTick(millisUntilFinished: Long) {}
             override fun onFinish() {
                 showNextStimulus()
@@ -270,16 +272,21 @@ class TutorialActivity : AppCompatActivity() {
         responseTimer?.cancel()
 
         if (currentLevel < 3) {
-            // 다음 레벨로 - 버튼을 보여주고 사용자가 누르면 진행
-            Toast.makeText(this, "${currentLevel}-Back 연습 완료!", Toast.LENGTH_SHORT).show()
-
-            timerText.text = "연습 완료! '다음' 버튼을 눌러주세요"
+            // 버튼 없이 자동으로 다음 난이도 진입
+            Toast.makeText(this, "${currentLevel}-Back 연습 완료! 다음 난이도로 이동합니다.", Toast.LENGTH_SHORT).show()
+            timerText.text = "다음 난이도로 이동 중..."
             instructionText.text = "${currentLevel}-Back 연습 완료!\n다음: ${currentLevel + 1}-Back"
 
-            // 다음 버튼 활성화
-            nextButton.isEnabled = true
-            nextButton.visibility = View.VISIBLE
-            nextButton.text = "다음 난이도 시작"
+            nextButton.visibility = View.GONE  // 혹시 보이는 경우 숨김
+            nextButton.isEnabled = false
+
+            // 1초 정도 안내 후 자동 시작
+            object : CountDownTimer(1000, 1000) {
+                override fun onTick(millisUntilFinished: Long) {}
+                override fun onFinish() {
+                    startTutorialLevel(currentLevel + 1)
+                }
+            }.start()
         } else {
             // 모든 튜토리얼 완료
             finishTutorial()

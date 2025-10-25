@@ -116,28 +116,24 @@ class MainActivity : AppCompatActivity() {
         initializeParticipantDirectories()
 
         // 흐름 처리
+// 흐름 처리
         val resumeFromBlock = intent.getIntExtra("resumeFromBlock", -1)
         val startBaselineSurvey = intent.getBooleanExtra("startBaselineSurvey", false)
 
-        Log.d("NBack", "=== MainActivity Flow Control ===")
-        Log.d("NBack", "resumeFromBlock: $resumeFromBlock")
-        Log.d("NBack", "startBaselineSurvey: $startBaselineSurvey")
-        Log.d("NBack", "participantName: $participantName")
+// 안전장치: 재진입 시 남아있을 수 있는 플래그는 제거
+        intent.removeExtra("startBaselineSurvey")
 
-        if (startBaselineSurvey) {
-            // 튜토리얼에서 돌아온 경우 → 폴더 초기화 후 사전 설문으로
-            Log.d("NBack", "Flow: Tutorial -> Baseline Survey")
-            participantName = intent.getStringExtra("participantName") ?: participantName
-            initializeParticipantDirectories()  // ✅ 폴더 초기화 추가!
-            startBaselineSurvey()
-        } else if (resumeFromBlock >= 0) {
-            // 설문조사에서 돌아온 경우
+        if (resumeFromBlock >= 0) {
             Log.d("NBack", "Flow: Survey -> Experiment (resuming from block $resumeFromBlock)")
             participantName = intent.getStringExtra("participantName") ?: participantName
             initializeParticipantDirectories()
             resumeFromSelfReport(resumeFromBlock)
+        } else if (startBaselineSurvey) {
+            Log.d("NBack", "Flow: Tutorial -> Baseline Survey")
+            participantName = intent.getStringExtra("participantName") ?: participantName
+            initializeParticipantDirectories()
+            startBaselineSurvey()
         } else {
-            // 처음 시작하는 경우 → ManualActivity로 이동
             Log.d("NBack", "Flow: Start -> Manual")
             startManualActivity()
         }
@@ -493,9 +489,18 @@ class MainActivity : AppCompatActivity() {
             canvasHintText.visibility = View.GONE
             startButton.text = "실험 진행 중..."
             timerText.text = "실험 시작!"
-            // 기존에 쓰던 실험 시작/카운트다운 루틴 호출
-            showCountdown()  // 혹은 showNextStimulus() 등 네가 쓰는 함수
+
+            // ✅ 30초 대기 조건: (1) 0-back 첫 시작 (블록1)  (2) 1-back 2회차 시작 (블록5)
+            val isFirstStartOf0Back = (currentBlockNumber == 1 && currentN == 0 && currentTrial == 0)
+            val isSecondSession1Back = (currentBlockNumber == 5 && currentN == 1 && currentTrial == 0)
+
+            if (isFirstStartOf0Back || isSecondSession1Back) {
+                showCountdown(30)   // 30초 카운트다운
+            } else {
+                showCountdown()     // 기본 3초
+            }
         }
+
 
         clearButton.setOnClickListener {
             drawingView.clearCanvas()
@@ -819,18 +824,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ▼ 변경: 카운트다운 타이머를 필드에 보관하고 재시작마다 취소
-    private fun showCountdown() {
+    private fun showCountdown(seconds: Int = 3) {
         currentPhase = Phase.COUNTDOWN
         countdownTimer?.cancel()
-        var countdown = 3
-        timerText.text = "시작까지 $countdown 초"
 
-        countdownTimer = object : CountDownTimer(3000, 1000) {
+        var left = seconds
+        timerText.text = "시작까지 $left 초"
+
+        val totalMillis = seconds * 1000L
+        countdownTimer = object : CountDownTimer(totalMillis, 1000) {
             override fun onTick(millisUntilFinished: Long) {
-                countdown = (millisUntilFinished / 1000).toInt() + 1
-                timerText.text = "시작까지 $countdown 초"
+                left = (millisUntilFinished / 1000).toInt() + 1
+                timerText.text = "시작까지 $left 초"
             }
-
             override fun onFinish() {
                 timerText.text = "실험 시작!"
                 showNextStimulus()
@@ -884,20 +890,12 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onFinish() {
-                currentPhase = Phase.INTER_TRIAL
-                timerText.text = "시간 종료"
+                // 바로 저장하고 다음 시행으로 진행
                 saveTrialData()
-
-                interTrialTimer?.cancel()
-                interTrialTimer = object : CountDownTimer(1000, 1000) {
-                    override fun onTick(millisUntilFinished: Long) {}
-                    override fun onFinish() {
-                        drawingView.clearCanvas()
-                        canvasHintText.visibility = View.VISIBLE
-                        currentTrial++
-                        showNextStimulus()
-                    }
-                }.start()
+                drawingView.clearCanvas()
+                canvasHintText.visibility = View.VISIBLE
+                currentTrial++
+                showNextStimulus()
             }
         }.start()
     }
@@ -1231,27 +1229,15 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onFinish() {
-                currentPhase = Phase.AUTO_START
+                // 30초 휴식 종료 → 바로 다음 블록 세팅 후 시작
                 setupNextBlock()
-                timerText.text = "3초 후 자동 시작..."
-                startButton.text = "자동 시작 중..."
-
-                autoStartTimer?.cancel()
-                autoStartTimer = object : CountDownTimer(3000, 1000) {
-                    var countdown = 3
-                    override fun onTick(millisUntilFinished: Long) {
-                        countdown = (millisUntilFinished / 1000).toInt() + 1
-                        timerText.text = "자동 시작까지 $countdown 초"
-                    }
-                    override fun onFinish() {
-                        isExperimentRunning = true
-                        experimentStartTime = System.currentTimeMillis()
-                        startButton.text = "실험 진행 중..."
-                        timerText.text = "실험 시작!"
-                        showNextStimulus()
-                    }
-                }.start()
+                isExperimentRunning = true
+                experimentStartTime = System.currentTimeMillis()
+                startButton.text = "실험 진행 중..."
+                timerText.text = "실험 시작!"
+                showNextStimulus()
             }
+
         }.start()
     }
 
