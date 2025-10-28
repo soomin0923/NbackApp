@@ -998,12 +998,12 @@ class MainActivity : AppCompatActivity() {
             // ▼ 변경: FileWriter를 사용하여 append 모드로 작성
             FileWriter(nbackResultsFile, true).use { writer ->
                 if (needsHeader) {
-                    writer.write("participant,block,trial,n,stimulus,correct_answer,computer_time,timestamp,current_time,first_touch_time,last_touch_time,duration\n")
+                    writer.write("participant,block,trial,n,stimulus,correct_answer,computer_time,current_time,first_touch_time,last_touch_time,duration\n")
                                 Log.d("NBack", "Header written")
                 }
 
                 val csvLine = "${participantName},${trialData.block},${trialData.trial},${trialData.n},${trialData.stimulus}," +
-                        "${trialData.correctAnswer},${trialData.computerTime},${trialData.timestamp},${trialData.currentTime}," +
+                        "${trialData.correctAnswer},${trialData.computerTime},${trialData.currentTime}," +
                         "${trialData.firstTouchTime},${trialData.lastTouchTime},${trialData.duration}\n"
 
                 writer.write(csvLine)
@@ -1023,11 +1023,11 @@ class MainActivity : AppCompatActivity() {
                 val fallbackFile = File(filesDir, "nback_emergency.csv")
                 FileWriter(fallbackFile, true).use { writer ->
                     if (!fallbackFile.exists() || fallbackFile.length() == 0L) {
-                        writer.write("participant,block,trial,n,stimulus,correct_answer,computer_time,timestamp,current_time,first_touch_time,last_touch_time,duration\n")
+                        writer.write("participant,block,trial,n,stimulus,correct_answer,computer_time,current_time,first_touch_time,last_touch_time,duration\n")
                     }
 
                     val csvLine = "${participantName},${trialData.block},${trialData.trial},${trialData.n},${trialData.stimulus}," +
-                            "${trialData.correctAnswer},${trialData.computerTime},${trialData.timestamp},${trialData.currentTime}," +
+                            "${trialData.correctAnswer},${trialData.computerTime},${trialData.currentTime}," +
                             "${trialData.firstTouchTime},${trialData.lastTouchTime},${trialData.duration}\n"
                     writer.write(csvLine)
                     writer.flush()
