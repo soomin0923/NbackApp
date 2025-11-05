@@ -8,7 +8,11 @@ import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
+import java.io.FileOutputStream
+import java.io.OutputStreamWriter
+import java.io.BufferedWriter
 import java.io.FileWriter
+import java.text.Normalizer
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -89,6 +93,10 @@ class SelfReportActivity : AppCompatActivity() {
                     Log.d("SelfReport", "Created participant base directory")
                 }
 
+                // 파일 부모 디렉토리 보장
+                surveyResultsFile.parentFile?.let { parent ->
+                    if (!parent.exists()) parent.mkdirs()
+                }
                 return
             }
 
@@ -502,45 +510,96 @@ class SelfReportActivity : AppCompatActivity() {
         blockInfoText.text = description
     }
 
-    // ▼ 변경: 강화된 디버깅과 더 안전한 파일 저장
+    // =====================================
+    // ▼▼▼ 핵심 패치: UTF-8(+BOM) CSV 저장기 ▼▼▼
+    // =====================================
+
+    private fun writeCsvUtf8(
+        file: File,
+        headers: List<String>?,
+        rows: List<List<String>>
+    ) {
+        // 디렉토리 보장
+        file.parentFile?.let { if (!it.exists()) it.mkdirs() }
+
+        val isNewFile = !file.exists() || file.length() == 0L
+
+        FileOutputStream(file, /* append = */ true).use { fos ->
+            // 새 파일이면 BOM 기록 (Excel 호환성)
+            if (isNewFile) {
+                fos.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
+            }
+
+            OutputStreamWriter(fos, Charsets.UTF_8).use { osw ->
+                BufferedWriter(osw).use { bw ->
+                    fun esc(cell: String): String {
+                        val normalized = Normalizer.normalize(cell, Normalizer.Form.NFC)
+                        val escaped = normalized.replace("\"", "\"\"")
+                        return "\"$escaped\""
+                    }
+
+                    if (isNewFile && headers != null && headers.isNotEmpty()) {
+                        bw.write(headers.joinToString(",") { esc(it) })
+                        bw.write("\r\n")
+                    }
+
+                    for (row in rows) {
+                        bw.write(row.joinToString(",") { esc(it) })
+                        bw.write("\r\n")
+                    }
+                    bw.flush()
+                }
+            }
+        }
+    }
+
+    // ▼ 변경: 강화된 디버깅과 더 안전한 파일 저장 (UTF-8+BOM)
     private fun saveSurveyData() {
         try {
-            // Ensure file exists and open in append mode
-            val surveyResultsFile = File(surveyFilePath ?: run {
-                // Fallback: Downloads/NBack_Experiment_Results/{participantName}/nback_survey.csv
-                val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                val baseDir = File(downloads, "NBack_Experiment_Results")
-                val participantDir = File(baseDir, participantName)
-                if (!participantDir.exists()) participantDir.mkdirs()
-                File(participantDir, "nback_survey.csv").absolutePath
-            })
-            val fileObj = if (surveyResultsFile is File) surveyResultsFile else File(surveyResultsFile.toString())
+            // 프로퍼티로 초기화된 파일 객체 사용 (가리기 방지)
+            val fileObj = surveyResultsFile
             val needsHeader = !fileObj.exists() || fileObj.length() == 0L
 
-            // Prepare current context values
+            // 현재 컨텍스트 값
             val ts = System.currentTimeMillis()
             val currentTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(ts))
 
-            FileWriter(fileObj, true).use { fw ->
-                if (needsHeader) {
-                    fw.write("timestamp,current_time,participant_name,survey_type,block_number,block_name,question_key,response,question_category\n")
+            val headers = listOf(
+                "timestamp","current_time","participant_name","survey_type",
+                "block_number","block_name","question_key","response","question_category"
+            )
+
+            val rows = surveyResponses.map { (key, value) ->
+                val category = when {
+                    key.contains("stress", ignoreCase = true) -> "stress"
+                    key.contains("place", ignoreCase = true) -> "place"
+                    key.contains("activity", ignoreCase = true) -> "activity"
+                    key.contains("social", ignoreCase = true) -> "social"
+                    else -> "other"
                 }
-                surveyResponses.forEach { (key, value) ->
-                    val category = when {
-                        key.contains("stress", ignoreCase = true) -> "stress"
-                        key.contains("place", ignoreCase = true) -> "place"
-                        key.contains("activity", ignoreCase = true) -> "activity"
-                        key.contains("social", ignoreCase = true) -> "social"
-                        else -> "other"
-                    }
-                    val escapedResponse = value.toString().replace("\"", "\"\"")
-                    val row = "${ts},${currentTime},${participantName},${surveyType},${blockNumber},${blockName},${key},\"${escapedResponse}\",${category}\n"
-                    fw.write(row)
-                }
+                listOf(
+                    ts.toString(),
+                    currentTime,
+                    participantName,
+                    surveyType,
+                    blockNumber.toString(),
+                    blockName,
+                    key,
+                    value.toString(),
+                    category
+                )
             }
+
+            writeCsvUtf8(
+                file = fileObj,
+                headers = if (needsHeader) headers else null,
+                rows = rows
+            )
+
             Toast.makeText(this, "설문이 저장되었습니다: ${fileObj.absolutePath}", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Log.e("SelfReportActivity", "설문 저장 중 오류", e)
             Toast.makeText(this, "설문 저장 오류: ${e.message}", Toast.LENGTH_LONG).show()
         }
-    }}
+    }
+}

@@ -47,7 +47,7 @@ class StartActivity : AppCompatActivity() {
         confirmNameButton.text = "이름 확인"
 
         // EditText 힌트 설정
-        participantNameEditText.hint = "예: 홍길동"
+        participantNameEditText.hint = "예: 오늘날짜-시간-장소(1103-13-S)"
         participantNameEditText.requestFocus()
     }
 

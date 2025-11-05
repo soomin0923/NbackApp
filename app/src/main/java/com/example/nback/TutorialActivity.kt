@@ -201,8 +201,7 @@ class TutorialActivity : AppCompatActivity() {
 
     private fun startResponsePeriod() {
         isWaitingForResponse = true
-        val responseTime = 5000L // 튜토리얼은 5초 (실제 실험보다 길게)
-
+        val responseTime = 3000L
         responseTimer?.cancel()
         responseTimer = object : CountDownTimer(responseTime, 100) {
             override fun onTick(millisUntilFinished: Long) {
